@@ -82,6 +82,7 @@
                             <th>Dealer</th>
                             <th>Current Stock</th>
                             <th>Minimum Stock Level</th>
+                            <th>Expected Profit</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -93,6 +94,7 @@
                             <td>{{ product.dealer.name if product.dealer else 'No Dealer' }}</td>
                             <td>{{ product.current_stock }}</td>
                             <td>{{ product.min_stock_level }}</td>
+                            <td>KSh {{ "%.2f"|format((product.selling_price - product.buying_price) * product.current_stock) }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
