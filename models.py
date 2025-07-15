@@ -33,6 +33,7 @@ class Product(db.Model):
     current_stock = db.Column(db.Integer, default=0)
     min_stock_level = db.Column(db.Integer, default=5)
     tax_rate = db.Column(db.Float, default=0.16)
+    vatable = db.Column(db.Boolean, default=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'))
     dealer_id = db.Column(db.Integer, db.ForeignKey('dealers.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

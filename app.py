@@ -284,19 +284,30 @@ def delete_product(product_id):
 
     return jsonify({'message': 'Product deleted successfully!'})
 
-@app.route('/products/<int:product_id>', methods=['PUT'])
+@app.route('/products/edit/<int:product_id>', methods=['GET', 'POST'])
 @login_required('manager' and 'admin')
-def update_product(product_id):
+def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
-    data = request.get_json()
+    suppliers = Supplier.query.all()
+    dealers = Dealer.query.all()
 
-    # Only update allowed fields
-    product.buying_price = data.get('buying_price', product.buying_price)
-    product.selling_price = data.get('selling_price', product.selling_price)
-    product.current_stock = data.get('current_stock', product.current_stock)
+    if request.method == 'POST':
+        product.name = request.form['name']
+        product.category = request.form['category']
+        product.buying_price = float(request.form['buying_price'])
+        product.selling_price = float(request.form['selling_price'])
+        product.current_stock = int(request.form['stock'])
+        product.min_stock_level = int(request.form['min_stock'])
+        product.barcode = request.form['barcode'].strip()
+        product.supplier_id = request.form['supplier_id']
+        product.dealer_id = request.form['dealer_id']
+        product.vatable = 'vatable' in request.form
 
-    db.session.commit()
-    return jsonify({'message': 'Product updated successfully!'})
+        db.session.commit()
+        flash('Product updated successfully!', 'success')
+        return redirect(url_for('products'))
+
+    return render_template('edit_product.html', product=product, suppliers=suppliers, dealers=dealers)
 
 @app.route('/admin/users')
 @login_required('admin')
@@ -364,7 +375,8 @@ def get_product_by_barcode(barcode):
             'name': product.name,
             'price': product.selling_price,
             'stock': product.current_stock,
-            'tax_rate': product.tax_rate
+            'tax_rate': product.tax_rate,
+            'vatable': product.vatable
         })
     return jsonify({'error': 'Product not found'}), 404
 # Add user management routes
@@ -446,6 +458,7 @@ def add_product():
         barcode = request.form['barcode'].strip()
         supplier_id = request.form['supplier_id']
         dealer_id = request.form['dealer_id']  # Get dealer_id from form
+        vatable = 'vatable' in request.form
 
         if not barcode:
             flash('Barcode is required.', 'danger')
@@ -464,7 +477,8 @@ def add_product():
             selling_price=selling_price,
             current_stock=stock,
             supplier_id=supplier_id,
-            dealer_id=dealer_id  # Assign dealer_id to the product
+            dealer_id=dealer_id,  # Assign dealer_id to the product
+            vatable=vatable
         )
 
         db.session.add(new_product)
@@ -480,7 +494,8 @@ def add_product():
 @login_required()
 def pos():
     products = Product.query.filter(Product.current_stock > 0).all()
-    return render_template('pos.html', products=products)
+    customers = Customer.query.all()
+    return render_template('pos.html', products=products, customers=customers)
 
 @app.route('/api/products/<barcode>')
 def get_product(barcode):
@@ -506,8 +521,16 @@ def checkout():
         return jsonify({'error': 'No items in cart'}), 400
 
     # Calculate totals
-    subtotal = sum(item['price'] * item['quantity'] for item in items)
-    tax = calculate_tax(subtotal)
+    subtotal = 0
+    tax = 0
+    for item in items:
+        product = Product.query.get(item['id'])
+        if product:
+            item_total = product.selling_price * item['quantity']
+            subtotal += item_total
+            if product.vatable:
+                tax += item_total * product.tax_rate
+
     total = subtotal + tax
 
     # Create sale
@@ -1025,6 +1048,70 @@ def add_financier_credit():
 def list_financier_debits():
     debits = FinancierDebit.query.order_by(FinancierDebit.date.desc()).all()
     return render_template('financiers/debits.html', debits=debits)
+
+# Add a new route for customers
+@app.route('/customers')
+@login_required('manager' and 'admin')
+def list_customers():
+    customers = Customer.query.all()
+    return render_template('customers/list.html', customers=customers)
+
+@app.route('/customers/add', methods=['GET', 'POST'])
+@login_required('manager' and 'admin')
+def add_customer():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        phone = request.form['phone']
+
+        if not name:
+            flash('Name is required.', 'danger')
+            return redirect(url_for('add_customer'))
+
+        new_customer = Customer(
+            name=name,
+            email=email,
+            phone=phone
+        )
+
+        db.session.add(new_customer)
+        db.session.commit()
+
+        flash('Customer added successfully!', 'success')
+        return redirect(url_for('list_customers'))
+
+    return render_template('customers/add.html')
+
+@app.route('/customers/edit/<int:customer_id>', methods=['GET', 'POST'])
+@login_required('manager' and 'admin')
+def edit_customer(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+
+    if request.method == 'POST':
+        customer.name = request.form['name']
+        customer.email = request.form['email']
+        customer.phone = request.form['phone']
+
+        if not customer.name:
+            flash('Name is required.', 'danger')
+            return redirect(url_for('edit_customer', customer_id=customer_id))
+
+        db.session.commit()
+
+        flash('Customer updated successfully!', 'success')
+        return redirect(url_for('list_customers'))
+
+    return render_template('customers/edit.html', customer=customer)
+
+@app.route('/customers/delete/<int:customer_id>', methods=['POST'])
+@login_required('manager' and 'admin')
+def delete_customer(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    db.session.delete(customer)
+    db.session.commit()
+
+    flash('Customer deleted successfully!', 'success')
+    return redirect(url_for('list_customers'))
 
 @app.route('/financiers/debits/add', methods=['GET', 'POST'])
 @login_required('manager' and 'admin')

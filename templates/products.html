@@ -50,9 +50,9 @@
                         {% endif %}
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-outline-secondary" title="Edit" onclick="editProduct({{ product.id }})">
+                        <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
                             <i class="bi bi-pencil"></i>
-                        </button>
+                        </a>
                         <button class="btn btn-sm btn-outline-danger" title="Delete" onclick="deleteProduct({{ product.id }})">
                             <i class="bi bi-trash"></i>
                         </button>
