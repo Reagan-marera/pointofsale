@@ -1,0 +1,33 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Edit Expense{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Edit Expense</h1>
+</div>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="date" class="form-label">Date</label>
+        <input type="date" class="form-control" id="date" name="date" value="{{ expense.date.strftime('%Y-%m-%d') }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="payee_name" class="form-label">Payee Name</label>
+        <input type="text" class="form-control" id="payee_name" name="payee_name" value="{{ expense.payee_name }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="transaction_details" class="form-label">Transaction Details</label>
+        <textarea class="form-control" id="transaction_details" name="transaction_details" required>{{ expense.transaction_details }}</textarea>
+    </div>
+    <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <textarea class="form-control" id="description" name="description">{{ expense.description }}</textarea>
+    </div>
+    <div class="mb-3">
+        <label for="amount" class="form-label">Amount</label>
+        <input type="number" step="0.01" class="form-control" id="amount" name="amount" value="{{ expense.amount }}" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Update Expense</button>
+</form>
+{% endblock %}

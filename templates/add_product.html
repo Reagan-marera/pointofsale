@@ -1,0 +1,88 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Add Product{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Add New Product</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('products') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Products
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <form method="POST" action="{{ url_for('add_product') }}">
+            <div class="mb-3">
+                <label for="name" class="form-label">Product Name</label>
+                <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="category" class="form-label">Category</label>
+                <select class="form-select" id="category" name="category" required>
+                    <option value="Electronics" selected>Electronics</option>
+                    <!-- Add more categories as needed -->
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="supplier_id" class="form-label">Supplier</label>
+                <select class="form-select" id="supplier_id" name="supplier_id" required>
+                    <option value="" selected disabled>Select a supplier</option>
+                    {% for supplier in suppliers %}
+                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="dealer_id" class="form-label">Dealer</label>
+                <select class="form-select" id="dealer_id" name="dealer_id" required>
+                    <option value="" selected disabled>Select a dealer</option>
+                    {% for dealer in dealers %}
+                    <option value="{{ dealer.id }}">{{ dealer.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="buying_price" class="form-label">Buying Price</label>
+                    <div class="input-group">
+                        <span class="input-group-text">KSh</span>
+                        <input type="number" step="0.01" class="form-control" id="buying_price" name="buying_price" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="selling_price" class="form-label">Selling Price</label>
+                    <div class="input-group">
+                        <span class="input-group-text">KSh</span>
+                        <input type="number" step="0.01" class="form-control" id="selling_price" name="selling_price" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="stock" class="form-label">Initial Stock</label>
+                    <input type="number" class="form-control" id="stock" name="stock" value="0" min="0" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="min_stock" class="form-label">Min Stock Level</label>
+                    <input type="number" class="form-control" id="min_stock" name="min_stock" value="5" min="0" required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="barcode" class="form-label">Barcode</label>
+                <input type="text" class="form-control" id="barcode" name="barcode" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Product</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

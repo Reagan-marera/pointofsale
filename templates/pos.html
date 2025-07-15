@@ -1,0 +1,104 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}POS Terminal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">POS Terminal</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button class="btn btn-sm btn-outline-secondary" id="new-sale-btn">
+            <i class="bi bi-plus-circle"></i> New Sale
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Scan Products</h5>
+            </div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="barcode-input" placeholder="Scan barcode..." autofocus>
+                    <button class="btn btn-primary" type="button" id="scan-btn">
+                        <i class="bi bi-upc-scan"></i> Scan
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm" id="cart-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Price</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cart-items">
+                            <!-- Cart items will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Payment</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="customer-search" class="form-label">Customer (Optional)</label>
+                    <input type="text" class="form-control" id="customer-search" placeholder="Search customer...">
+                </div>
+                
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <td>Subtotal:</td>
+                                <td class="text-end" id="subtotal">KSh 0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Tax (16%):</td>
+                                <td class="text-end" id="tax">KSh 0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Total:</td>
+                                <td class="text-end fw-bold" id="total">KSh 0.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Payment Method</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="payment-method" id="cash" value="cash" checked>
+                        <label class="btn btn-outline-primary" for="cash">Cash</label>
+                        
+                        <input type="radio" class="btn-check" name="payment-method" id="mpesa" value="mpesa">
+                        <label class="btn btn-outline-primary" for="mpesa">M-Pesa</label>
+                        
+                        <input type="radio" class="btn-check" name="payment-method" id="card" value="card">
+                        <label class="btn btn-outline-primary" for="card">Card</label>
+                    </div>
+                </div>
+                
+                <button class="btn btn-success w-100 py-3" id="checkout-btn">
+                    <i class="bi bi-credit-card"></i> Complete Sale
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pos.js') }}"></script>
+{% endblock %}

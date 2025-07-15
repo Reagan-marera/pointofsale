@@ -1,0 +1,82 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Receipt #{{ sale.receipt_number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Receipt #{{ sale.receipt_number }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button class="btn btn-sm btn-outline-secondary me-2" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print
+        </button>
+        <a href="{{ url_for('pos') }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-circle"></i> New Sale
+        </a>
+    </div>
+</div>
+
+<div class="receipt-container">
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <h3>IMOFLAMES RETAIL LIMITED</h3>
+                <p class="mb-1">Receipt #{{ sale.receipt_number }}</p>
+                <p class="text-muted">{{ sale.sale_date.strftime('%d-%b-%Y %H:%M:%S') }}</p>
+            </div>
+            
+            <div class="table-responsive mb-4">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th class="text-end">Price</th>
+                            <th class="text-end">Qty</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in sale.items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td class="text-end">{{ "%.2f"|format(item.unit_price) }}</td>
+                            <td class="text-end">{{ item.quantity }}</td>
+                            <td class="text-end">{{ "%.2f"|format(item.total_price) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="row justify-content-end">
+                <div class="col-md-6">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <td>Subtotal:</td>
+                                <td class="text-end">KSh {{ "%.2f"|format(sale.subtotal) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Tax (16%):</td>
+                                <td class="text-end">KSh {{ "%.2f"|format(sale.tax_amount) }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total:</strong></td>
+                                <td class="text-end"><strong>KSh {{ "%.2f"|format(sale.total_amount) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Payment Method:</td>
+                                <td class="text-end">{{ sale.payment_method|upper }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4 pt-4 border-top">
+                <p class="mb-1">Thank you for shopping with us!</p>
+                <p class="text-muted small">Goods sold are not returnable unless faulty</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Financier Debits</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 18px;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #dddddd;
+        }
+
+        th {
+            background-color: #009879;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #e9e9e9;
+        }
+
+        caption {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Financier Debits</h1>
+    <a href="{{ url_for('add_financier_debit') }}">Add Debit</a>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Financier ID</th>
+                <th>Financier Name</th>
+                <th>Description</th>
+                <th>Principal Amount</th>
+                <th>Interest Amount</th>
+                <th>Total Amount</th>
+                <th>Transaction Ref</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for debit in debits %}
+            <tr>
+                <td>{{ debit.date }}</td>
+                <td>{{ debit.financier_id }}</td>
+                <td>{{ debit.financier_name }}</td>
+                <td>{{ debit.description }}</td>
+                <td>{{ debit.principal_amount }}</td>
+                <td>{{ debit.interest_amount }}</td>
+                <td>{{ debit.total_amount }}</td>
+                <td>{{ debit.transaction_ref }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
