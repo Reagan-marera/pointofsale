@@ -6,8 +6,11 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">POS Terminal</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        <button class="btn btn-sm btn-outline-secondary" id="new-sale-btn">
-            <i class="bi bi-plus-circle"></i> New Sale
+        <button class="btn btn-sm btn-outline-secondary me-2" id="new-sale-btn">
+            <i class="fas fa-plus-circle"></i> New Sale
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="print-receipt-btn">
+            <i class="fas fa-print"></i> Print Receipt
         </button>
     </div>
 </div>
@@ -53,8 +56,13 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label for="customer-search" class="form-label">Customer (Optional)</label>
-                    <input type="text" class="form-control" id="customer-search" placeholder="Search customer...">
+                    <label for="customer-select" class="form-label">Customer (Optional)</label>
+                    <select class="form-select" id="customer-select">
+                        <option value="">Select a customer</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}">{{ customer.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 
                 <div class="table-responsive mb-3">

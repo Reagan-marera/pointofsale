@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalEl = document.getElementById('total');
     const checkoutBtn = document.getElementById('checkout-btn');
     const newSaleBtn = document.getElementById('new-sale-btn');
+    const printReceiptBtn = document.getElementById('print-receipt-btn');
     
     // Event Listeners
     barcodeInput.addEventListener('keypress', function(e) {
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
     scanBtn.addEventListener('click', scanProduct);
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
+    printReceiptBtn.addEventListener('click', printReceipt);
     
     // Functions
     function scanProduct() {
@@ -79,7 +81,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 name: product.name,
                 price: product.price,
                 quantity: 1,
-                stock: product.stock // 👈 Store the stock with the cart item
+                stock: product.stock, // 👈 Store the stock with the cart item
+                vatable: product.vatable
             });
         }
     
@@ -161,7 +164,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Update totals
-        const tax = subtotal * 0.16;
+        let tax = 0;
+        cart.forEach(item => {
+            if (item.vatable) {
+                tax += item.price * item.quantity * 0.16;
+            }
+        });
         const total = subtotal + tax;
         
         subtotalEl.textContent = `KSh ${subtotal.toFixed(2)}`;
