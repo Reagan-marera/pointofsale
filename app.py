@@ -1019,9 +1019,11 @@ def list_financier_credits():
 @app.route('/financiers/credits/add', methods=['GET', 'POST'])
 @login_required('manager' and 'admin')
 def add_financier_credit():
+    financiers = Financier.query.all()
     if request.method == 'POST':
         financier_id = request.form['financier_id']
-        financier_name = request.form['financier_name']
+        financier = Financier.query.get(financier_id)
+        financier_name = financier.financier_name
         description = request.form['description']
         amount_credited = float(request.form['amount_credited'])
         transaction_ref = request.form['transaction_ref']
@@ -1040,7 +1042,7 @@ def add_financier_credit():
         flash('Financier credit added successfully!', 'success')
         return redirect(url_for('list_financier_credits'))
 
-    return render_template('financiers/add_credit.html')
+    return render_template('financiers/add_credit.html', financiers=financiers)
 
 # Routes for Financier Debits
 @app.route('/financiers/debits')
@@ -1116,9 +1118,11 @@ def delete_customer(customer_id):
 @app.route('/financiers/debits/add', methods=['GET', 'POST'])
 @login_required('manager' and 'admin')
 def add_financier_debit():
+    financiers = Financier.query.all()
     if request.method == 'POST':
         financier_id = request.form['financier_id']
-        financier_name = request.form['financier_name']
+        financier = Financier.query.get(financier_id)
+        financier_name = financier.financier_name
         description = request.form['description']
         principal_amount = float(request.form['principal_amount'])
         interest_amount = float(request.form.get('interest_amount', 0.0))
@@ -1141,6 +1145,6 @@ def add_financier_debit():
         flash('Financier debit added successfully!', 'success')
         return redirect(url_for('list_financier_debits'))
 
-    return render_template('financiers/add_debit.html')
+    return render_template('financiers/add_debit.html', financiers=financiers)
 if __name__ == '__main__':
     app.run(debug=True)
