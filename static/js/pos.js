@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkoutBtn = document.getElementById('checkout-btn');
     const newSaleBtn = document.getElementById('new-sale-btn');
     const printReceiptBtn = document.getElementById('print-receipt-btn');
+    const productSearch = document.getElementById('product-search');
     
     // Event Listeners
     barcodeInput.addEventListener('keypress', function(e) {
@@ -24,6 +25,10 @@ document.addEventListener('DOMContentLoaded', function() {
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
+    productSearch.addEventListener('change', function() {
+        barcodeInput.value = this.value;
+        scanProduct();
+    });
     
     // Functions
     function scanProduct() {
