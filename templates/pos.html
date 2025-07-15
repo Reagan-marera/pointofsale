@@ -25,8 +25,17 @@
                 <div class="input-group mb-3">
                     <input type="text" class="form-control" id="barcode-input" placeholder="Scan barcode..." autofocus>
                     <button class="btn btn-primary" type="button" id="scan-btn">
-                        <i class="bi bi-upc-scan"></i> Scan
+                        <i class="fas fa-barcode"></i> Scan
                     </button>
+                </div>
+                <div class="mb-3">
+                    <label for="product-search" class="form-label">Or search for a product</label>
+                    <select class="form-select" id="product-search">
+                        <option value="">Select a product</option>
+                        {% for product in products %}
+                        <option value="{{ product.barcode }}">{{ product.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 
                 <div class="table-responsive">
@@ -99,7 +108,7 @@
                 </div>
                 
                 <button class="btn btn-success w-100 py-3" id="checkout-btn">
-                    <i class="bi bi-credit-card"></i> Complete Sale
+                    <i class="fas fa-credit-card"></i> Complete Sale
                 </button>
             </div>
         </div>
