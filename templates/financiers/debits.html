@@ -1,74 +1,51 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Financier Debits</title>
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 18px;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
-        }
+{% extends 'layouts/base.html' %}
 
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #dddddd;
-        }
+{% block title %}Manage Financier Debits{% endblock %}
 
-        th {
-            background-color: #009879;
-            color: white;
-        }
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">Manage Financier Debits</h1>
+        <a href="{{ url_for('add_financier_debit') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add New Debit
+        </a>
+    </div>
 
-        tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
+    {% include 'partials/_flash_messages.html' %}
 
-        tr:hover {
-            background-color: #e9e9e9;
-        }
-
-        caption {
-            font-weight: bold;
-            margin-bottom: 10px;
-            font-size: 20px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Financier Debits</h1>
-    <a href="{{ url_for('add_financier_debit') }}">Add Debit</a>
-    <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Financier ID</th>
-                <th>Financier Name</th>
-                <th>Description</th>
-                <th>Principal Amount</th>
-                <th>Interest Amount</th>
-                <th>Total Amount</th>
-                <th>Transaction Ref</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for debit in debits %}
-            <tr>
-                <td>{{ debit.date }}</td>
-                <td>{{ debit.financier_id }}</td>
-                <td>{{ debit.financier_name }}</td>
-                <td>{{ debit.description }}</td>
-                <td>{{ debit.principal_amount }}</td>
-                <td>{{ debit.interest_amount }}</td>
-                <td>{{ debit.total_amount }}</td>
-                <td>{{ debit.transaction_ref }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</body>
-</html>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Financier Name</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Principal</th>
+                        <th scope="col">Interest</th>
+                        <th scope="col">Total</th>
+                        <th scope="col">Transaction Ref</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for debit in debits %}
+                    <tr>
+                        <td>{{ debit.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ debit.financier_name }}</td>
+                        <td>{{ debit.description }}</td>
+                        <td>KSh {{ "%.2f"|format(debit.principal_amount) }}</td>
+                        <td>KSh {{ "%.2f"|format(debit.interest_amount) }}</td>
+                        <td>KSh {{ "%.2f"|format(debit.total_amount) }}</td>
+                        <td>{{ debit.transaction_ref }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No debits found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

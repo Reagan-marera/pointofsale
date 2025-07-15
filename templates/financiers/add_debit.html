@@ -1,31 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Add Financier Debit</title>
-</head>
-<body>
-    <h1>Add Financier Debit</h1>
-    <form method="POST" action="{{ url_for('add_financier_debit') }}">
-        <label for="financier_id">Financier ID:</label>
-        <input type="text" id="financier_id" name="financier_id" required><br><br>
+{% extends 'layouts/base.html' %}
 
-        <label for="financier_name">Financier Name:</label>
-        <input type="text" id="financier_name" name="financier_name" required><br><br>
+{% block title %}Add Financier Debit{% endblock %}
 
-        <label for="description">Description:</label>
-        <textarea id="description" name="description"></textarea><br><br>
-
-        <label for="principal_amount">Principal Amount:</label>
-        <input type="number" step="0.01" id="principal_amount" name="principal_amount" required><br><br>
-
-        <label for="interest_amount">Interest Amount:</label>
-        <input type="number" step="0.01" id="interest_amount" name="interest_amount"><br><br>
-
-        <label for="transaction_ref">Transaction Ref:</label>
-        <input type="text" id="transaction_ref" name="transaction_ref" required><br><br>
-
-        <button type="submit">Add Debit</button>
-    </form>
-</body>
-</html>
+{% block content %}
+<div class="container mt-4">
+    <h1 class="h2 mb-4">Add New Financier Debit</h1>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_financier_debit') }}">
+                <div class="mb-3">
+                    <label for="financier_id" class="form-label">Financier</label>
+                    <select class="form-select" id="financier_id" name="financier_id" required>
+                        <option value="" selected disabled>Select a financier</option>
+                        {% for financier in financiers %}
+                        <option value="{{ financier.id }}">{{ financier.financier_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="principal_amount" class="form-label">Principal Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">KSh</span>
+                            <input type="number" step="0.01" class="form-control" id="principal_amount" name="principal_amount" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="interest_amount" class="form-label">Interest Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">KSh</span>
+                            <input type="number" step="0.01" class="form-control" id="interest_amount" name="interest_amount">
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="transaction_ref" class="form-label">Transaction Reference</label>
+                    <input type="text" class="form-control" id="transaction_ref" name="transaction_ref" required>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <a href="{{ url_for('list_financier_debits') }}" class="btn btn-secondary me-2">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Add Debit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
