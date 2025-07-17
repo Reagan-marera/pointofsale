@@ -303,6 +303,10 @@ def edit_product(product_id):
         product.dealer_id = request.form['dealer_id']
         product.vatable = 'vatable' in request.form
 
+        if not product.name or not product.category or not product.buying_price or not product.selling_price or not product.current_stock or not product.min_stock_level or not product.barcode or not product.supplier_id or not product.dealer_id:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('edit_product', product_id=product_id))
+
         db.session.commit()
         flash('Product updated successfully!', 'success')
         return redirect(url_for('products'))
@@ -467,6 +471,10 @@ def add_product():
         existing = Product.query.filter_by(barcode=barcode).first()
         if existing:
             flash('A product with this barcode already exists.', 'danger')
+            return redirect(url_for('add_product'))
+
+        if not name or not category or not buying_price or not selling_price or not stock or not barcode or not supplier_id or not dealer_id:
+            flash('Please fill out all fields.', 'danger')
             return redirect(url_for('add_product'))
 
         new_product = Product(
@@ -768,6 +776,18 @@ def add_supplier():
         address = request.form['address']
         kra_pin = request.form['kra_pin']
 
+        if not name or not contact_person or not phone or not email or not address or not kra_pin:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('add_supplier'))
+
+        if Supplier.query.filter_by(email=email).first():
+            flash('A supplier with this email already exists.', 'danger')
+            return redirect(url_for('add_supplier'))
+
+        if Supplier.query.filter_by(phone=phone).first():
+            flash('A supplier with this phone number already exists.', 'danger')
+            return redirect(url_for('add_supplier'))
+
         supplier = Supplier(
             name=name,
             contact_person=contact_person,
@@ -798,6 +818,10 @@ def edit_supplier(supplier_id):
         supplier.email = request.form['email']
         supplier.address = request.form['address']
         supplier.KRA_pin = request.form['kra_pin']
+
+        if not supplier.name or not supplier.contact_person or not supplier.phone or not supplier.email or not supplier.address or not supplier.KRA_pin:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('edit_supplier', supplier_id=supplier_id))
 
         db.session.commit()
 
@@ -894,6 +918,18 @@ def add_dealer():
         email = request.form['email']
         address = request.form['address']
 
+        if not name or not contact_person or not phone or not email or not address:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('add_dealer'))
+
+        if Dealer.query.filter_by(email=email).first():
+            flash('A dealer with this email already exists.', 'danger')
+            return redirect(url_for('add_dealer'))
+
+        if Dealer.query.filter_by(phone=phone).first():
+            flash('A dealer with this phone number already exists.', 'danger')
+            return redirect(url_for('add_dealer'))
+
         dealer = Dealer(
             name=name,
             contact_person=contact_person,
@@ -921,6 +957,10 @@ def edit_dealer(dealer_id):
         dealer.phone = request.form['phone']
         dealer.email = request.form['email']
         dealer.address = request.form['address']
+
+        if not dealer.name or not dealer.contact_person or not dealer.phone or not dealer.email or not dealer.address:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('edit_dealer', dealer_id=dealer_id))
 
         db.session.commit()
 
@@ -960,6 +1000,22 @@ def add_financier():
         kra_pin = request.form['kra_pin']
         description = request.form['description']
 
+        if not financier_id or not financier_name or not address or not email or not phone_number or not kra_pin:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('add_financier'))
+
+        if Financier.query.filter_by(financier_id=financier_id).first():
+            flash('A financier with this ID already exists.', 'danger')
+            return redirect(url_for('add_financier'))
+
+        if Financier.query.filter_by(email=email).first():
+            flash('A financier with this email already exists.', 'danger')
+            return redirect(url_for('add_financier'))
+
+        if Financier.query.filter_by(phone_number=phone_number).first():
+            flash('A financier with this phone number already exists.', 'danger')
+            return redirect(url_for('add_financier'))
+
         financier = Financier(
             financier_id=financier_id,
             financier_name=financier_name,
@@ -991,6 +1047,10 @@ def edit_financier(financier_id):
         financier.phone_number = request.form['phone_number']
         financier.kra_pin = request.form['kra_pin']
         financier.description = request.form['description']
+
+        if not financier.financier_id or not financier.financier_name or not financier.address or not financier.email or not financier.phone_number or not financier.kra_pin:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('edit_financier', financier_id=financier_id))
 
         db.session.commit()
 
@@ -1027,6 +1087,10 @@ def add_financier_credit():
         description = request.form['description']
         amount_credited = float(request.form['amount_credited'])
         transaction_ref = request.form['transaction_ref']
+
+        if not financier_id or not description or not amount_credited or not transaction_ref:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('add_financier_credit'))
 
         credit = FinancierCredit(
             financier_id=financier_id,
@@ -1066,8 +1130,16 @@ def add_customer():
         email = request.form['email']
         phone = request.form['phone']
 
-        if not name:
-            flash('Name is required.', 'danger')
+        if not name or not email or not phone:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('add_customer'))
+
+        if Customer.query.filter_by(email=email).first():
+            flash('A customer with this email already exists.', 'danger')
+            return redirect(url_for('add_customer'))
+
+        if Customer.query.filter_by(phone=phone).first():
+            flash('A customer with this phone number already exists.', 'danger')
             return redirect(url_for('add_customer'))
 
         new_customer = Customer(
@@ -1094,8 +1166,8 @@ def edit_customer(customer_id):
         customer.email = request.form['email']
         customer.phone = request.form['phone']
 
-        if not customer.name:
-            flash('Name is required.', 'danger')
+        if not customer.name or not customer.email or not customer.phone:
+            flash('Please fill out all fields.', 'danger')
             return redirect(url_for('edit_customer', customer_id=customer_id))
 
         db.session.commit()
@@ -1128,6 +1200,10 @@ def add_financier_debit():
         interest_amount = float(request.form.get('interest_amount', 0.0))
         total_amount = principal_amount + interest_amount
         transaction_ref = request.form['transaction_ref']
+
+        if not financier_id or not description or not principal_amount or not transaction_ref:
+            flash('Please fill out all fields.', 'danger')
+            return redirect(url_for('add_financier_debit'))
 
         debit = FinancierDebit(
             financier_id=financier_id,
