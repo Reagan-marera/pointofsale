@@ -36,6 +36,10 @@
                         <option value="card" {% if request.args.get('payment_method') == 'card' %}selected{% endif %}>Card</option>
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label for="product_search" class="form-label">Product Name or Barcode</label>
+                    <input type="text" class="form-control" id="product_search" name="product_search" value="{{ request.args.get('product_search', '') }}">
+                </div>
                 <div class="col-md-3 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary w-100">Filter</button>
                 </div>
