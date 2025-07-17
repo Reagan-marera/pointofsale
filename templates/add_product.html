@@ -101,30 +101,38 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/scandit-sdk/scandit-sdk.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/quagga/quagga.min.js') }}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        ScanditSDK.configure("Ak72ID6eGFFCH8IGPvw/uNsB24iwEyC6liWWDx8z/xUmbpref2O/RVdZ82ZbNkjsgy9+OhZYGbHcb7VBsEmzrIZhPTmMXNVGrFiaRAQtNh7nEqfzIg9S3etCitjpT2udOnoIRiQCSEWLZSJKjknJ7llxOeLMa4msLH3THeJvUMujWLVFMml96ah/fBBvZ76mhG9rU1oW08u9e1ftmHOxiih2OT7DFCDn5ljP8n9wjeHhZmuEmnIzHflmU9QKd3GgaGaafYxiFJtOQpU6ghSF1lFH3jL3bE8uYFaquBlGR3PeJV1GqlODTJd2HDpyXU1HqEMJR55VeNV1R7kaL3sKOipZzMGnKqHE6ElIObtpfIyiUQk5sEc4Kp5BpNg+UZBnvXAsWW9k0lIfQUrTGlik4W1fxb8gTH2g1UKYTeh1w/KaaD0Q3UebR315efsQeYK6y1Jdbuh7c89pRJtpgH1dnlVVgYu/CfKOeG2tMCx36kt7d2a7k3F7LfYXqrjPfgXB50iMTshFd/wgTPchMi3v6eIHtWyUR0sbtzwgilLy89jYRuk724YzQxTdMBcBXVFzqC0bJCXSaeltq+sUjbMn9qUBKRF8ayHWDsE07NkAhSMh3eOeT8DQFE5ojfQ/qzG65ds4uiBzZB2T6Dkeiscf2TKkpsxNsW40fFWWN0j3SPLVzM7eOxOe06442zWmtpRMMFenQTpwBjPqJjPZD+Jbr7QBdjnEFdPLSD4zuwEzGl8LzHdwGIkYW5QUzQ3fHH+kzoxAm0wG1vvfuAy2uupV16jtw8N8Xe6Fa92S6wNVw5ih+9Fykd+Pl+A+nsid3HbYqDTHGslRlsz1HQ5njg0t3FoC45egWYrwihbtqd5one/lfAZk9qVLEQfrCTRl4XShXjY/ri+M0AnuiDsQcj1jqu05G22Ihxjev8PjTyyADIJLc+lGJu/63YJax/8FWwJqvpjgs+hCbb8Gb545jAR3msJcLW9Fur14khGCzUPjxLAVXOq+WdUzccZayimiFukhhTIIEDoZI0lu2GLM9LIhhkSAPKaeA70xWOsYEpUQdU9ptStT9eSz8WWO1e2SXHsabLn5Z2cRBSkEJe0gNbSqPMctCYj40mEG3q8Iywqq+hGGPJrmXVLywmgq+VVTh747c9r+DXKaj8R5Xzpt42qlo7ijot/UZTdFdKM0E85eDKCBsftjOcCbioc0LgokC1RgKWY=", {
-            engineLocation: "https://cdn.jsdelivr.net/npm/scandit-sdk@5.x/build/",
-        });
-        document.getElementById('scan-barcode-btn').addEventListener('click', function () {
-            let scannerContainer = document.getElementById('scanner-container');
-            if (scannerContainer.style.display === 'none') {
-                scannerContainer.style.display = 'block';
-                ScanditSDK.BarcodePicker.create(scannerContainer, {
-                    playSoundOnScan: true,
-                    vibrateOnScan: true,
-                }).then((barcodePicker) => {
-                    barcodePicker.on("scan", (scanResult) => {
-                        document.getElementById('barcode').value = scanResult.barcodes[0].data;
-                        scannerContainer.style.display = 'none';
-                        barcodePicker.destroy();
-                    });
-                });
-            } else {
+    document.getElementById('scan-barcode-btn').addEventListener('click', function () {
+        let scannerContainer = document.getElementById('scanner-container');
+        if (scannerContainer.style.display === 'none') {
+            scannerContainer.style.display = 'block';
+            Quagga.init({
+                inputStream : {
+                    name : "Live",
+                    type : "LiveStream",
+                    target: scannerContainer
+                },
+                decoder : {
+                    readers : ["code_128_reader"]
+                }
+            }, function(err) {
+                if (err) {
+                    console.log(err);
+                    return
+                }
+                console.log("Initialization finished. Ready to start");
+                Quagga.start();
+            });
+            Quagga.onDetected(function(result) {
+                document.getElementById('barcode').value = result.codeResult.code;
                 scannerContainer.style.display = 'none';
-            }
-        });
+                Quagga.stop();
+            });
+        } else {
+            scannerContainer.style.display = 'none';
+            Quagga.stop();
+        }
     });
 </script>
 {% endblock %}
