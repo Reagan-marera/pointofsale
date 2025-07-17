@@ -319,6 +319,27 @@ def manage_users():
     users = User.query.order_by(User.username.asc()).all()
     return render_template('users.html', users=users)
 
+@app.route('/admin/reports/supplier')
+@login_required('manager')
+def supplier_report():
+    suppliers = Supplier.query.all()
+    supplier_id = request.args.get('supplier_id', type=int)
+    products = []
+
+    if supplier_id:
+        sale_items = SaleItem.query.join(Product).filter(Product.supplier_id == supplier_id).all()
+        product_sales = {}
+        for item in sale_items:
+            if item.product_id not in product_sales:
+                product_sales[item.product_id] = {'items_sold': 0, 'total_sales': 0, 'total_profit': 0, 'name': item.product.name}
+            product_sales[item.product_id]['items_sold'] += item.quantity
+            product_sales[item.product_id]['total_sales'] += item.total_price
+            product_sales[item.product_id]['total_profit'] += (item.unit_price - item.product.buying_price) * item.quantity
+
+        products = list(product_sales.values())
+
+    return render_template('supplier_report.html', suppliers=suppliers, products=products)
+
 @app.route('/admin/reports/sales')
 @login_required('manager')
 def sales_report():
@@ -326,10 +347,17 @@ def sales_report():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     payment_method = request.args.get('payment_method')
+    product_search = request.args.get('product_search')
     
     # Build query
     query = Sale.query
     
+    if product_search:
+        query = query.join(SaleItem).join(Product).filter(
+            (Product.name.ilike(f'%{product_search}%')) |
+            (Product.barcode.ilike(f'%{product_search}%'))
+        )
+
     if start_date:
         start_date = datetime.strptime(start_date, '%Y-%m-%d')
         query = query.filter(Sale.sale_date >= start_date)
