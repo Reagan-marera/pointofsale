@@ -78,7 +78,15 @@
 
             <div class="mb-3">
                 <label for="barcode" class="form-label">Barcode</label>
-                <input type="text" class="form-control" id="barcode" name="barcode" required>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="barcode" name="barcode" required>
+                    <button class="btn btn-outline-secondary" type="button" id="scan-barcode-btn">
+                        <i class="fas fa-barcode"></i> Scan
+                    </button>
+                </div>
+            </div>
+            <div id="scanner-container" style="display: none;">
+                <video id="preview" style="width: 100%;"></video>
             </div>
 
             <div class="form-check mb-3">
@@ -92,4 +100,33 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+<script>
+    document.getElementById('scan-barcode-btn').addEventListener('click', function () {
+        let scannerContainer = document.getElementById('scanner-container');
+        if (scannerContainer.style.display === 'none') {
+            scannerContainer.style.display = 'block';
+            let scanner = new Instascan.Scanner({ video: document.getElementById('preview') });
+            scanner.addListener('scan', function (content) {
+                document.getElementById('barcode').value = content;
+                scannerContainer.style.display = 'none';
+                scanner.stop();
+            });
+            Instascan.Camera.getCameras().then(function (cameras) {
+                if (cameras.length > 0) {
+                    scanner.start(cameras[0]);
+                } else {
+                    console.error('No cameras found.');
+                }
+            }).catch(function (e) {
+                console.error(e);
+            });
+        } else {
+            scannerContainer.style.display = 'none';
+        }
+    });
+</script>
 {% endblock %}
