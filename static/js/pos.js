@@ -216,11 +216,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+        const splitPayment = document.getElementById('split-payment').checked;
         
         const checkoutData = {
             items: cart,
             payment_method: paymentMethod,
-            customer_id: customerId
+            customer_id: customerId,
+            split_payment: splitPayment
         };
         
         fetch('/api/checkout', {

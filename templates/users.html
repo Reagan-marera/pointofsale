@@ -90,6 +90,15 @@
                             <option value="admin">Admin</option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location</label>
+                        <select class="form-select" id="location" name="location_id">
+                            <option value="">No Location</option>
+                            {% for location in locations %}
+                            <option value="{{ location.id }}">{{ location.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -129,6 +138,15 @@
                             <option value="cashier" {% if user.role == 'cashier' %}selected{% endif %}>Cashier</option>
                             <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Manager</option>
                             <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location{{ user.id }}" class="form-label">Location</label>
+                        <select class="form-select" id="location{{ user.id }}" name="location_id">
+                            <option value="">No Location</option>
+                            {% for location in locations %}
+                            <option value="{{ location.id }}" {% if user.location_id == location.id %}selected{% endif %}>{{ location.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="mb-3 form-check">

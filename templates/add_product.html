@@ -125,6 +125,7 @@
                 Quagga.start();
             });
             Quagga.onDetected(function(result) {
+                console.log("Barcode detected and processed : [" + result.codeResult.code + "]", result);
                 document.getElementById('barcode').value = result.codeResult.code;
                 scannerContainer.style.display = 'none';
                 Quagga.stop();
