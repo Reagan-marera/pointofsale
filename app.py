@@ -176,7 +176,7 @@ def login_required(roles=['cashier']):
                 flash('User not found. Please log in again.', 'danger')
                 return redirect(url_for('login'))
 
-            if user.role not in roles and 'admin' not in roles:
+            if user.role not in roles and user.role != 'admin':
                 flash('You do not have permission to access this page', 'danger')
                 return redirect(url_for('dashboard'))
 
