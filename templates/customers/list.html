@@ -21,6 +21,7 @@
                         <th scope="col">Name</th>
                         <th scope="col">Email</th>
                         <th scope="col">Phone</th>
+                        <th scope="col">Loyalty Points</th>
                         <th scope="col">Actions</th>
                     </tr>
                 </thead>
@@ -30,6 +31,7 @@
                         <td>{{ customer.name }}</td>
                         <td>{{ customer.email }}</td>
                         <td>{{ customer.phone }}</td>
+                        <td>{{ customer.loyalty_points }}</td>
                         <td>
                             <a href="{{ url_for('edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-outline-primary me-2">
                                 <i class="fas fa-edit"></i> Edit

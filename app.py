@@ -158,7 +158,7 @@ def register():
             'status': 'success'
         }), 200
     return render_template('register.html', is_admin_registration=True)
-def login_required(role='cashier'):
+def login_required(roles=['cashier']):
     def decorator(f):
         from functools import wraps
 
@@ -173,7 +173,7 @@ def login_required(role='cashier'):
                 flash('User not found. Please log in again.', 'danger')
                 return redirect(url_for('login'))
 
-            if user.role not in [role, 'admin']:
+            if user.role not in roles and 'admin' not in roles:
                 flash('You do not have permission to access this page', 'danger')
                 return redirect(url_for('dashboard'))
 
@@ -189,20 +189,32 @@ def dashboard():
     # Get basic stats for dashboard
     total_products = Product.query.count()
     low_stock_products = Product.query.filter(Product.current_stock < Product.min_stock_level).count()
-    today_sales = Sale.query.filter(func.date(Sale.sale_date) == datetime.today().date()).count()
-    
-    # Get recent sales
-    recent_sales = Sale.query.order_by(Sale.sale_date.desc()).limit(5).all()
-    
-    # Get low stock items
-    low_stock_items = Product.query.filter(Product.current_stock < Product.min_stock_level).order_by(Product.current_stock.asc()).limit(5).all()
-    
-    return render_template('dashboard.html', 
+    today = datetime.today().date()
+    today_sales = Sale.query.filter(func.date(Sale.sale_date) == today).count()
+    total_customers = Customer.query.count()
+
+    # Get sales for the last 7 days
+    sales_this_week = []
+    max_sales = 0
+    for i in range(7):
+        day = today - timedelta(days=i)
+        sales = db.session.query(func.sum(Sale.total_amount)).filter(func.date(Sale.sale_date) == day).scalar() or 0
+        sales_this_week.append({'date': day.strftime('%a'), 'total_sales': sales})
+        if sales > max_sales:
+            max_sales = sales
+    sales_this_week.reverse()
+
+    # Get sales by payment method
+    sales_by_payment_method = db.session.query(Sale.payment_method, func.sum(Sale.total_amount).label('total')).group_by(Sale.payment_method).all()
+
+    return render_template('dashboard.html',
                          total_products=total_products,
                          low_stock_products=low_stock_products,
                          today_sales=today_sales,
-                         recent_sales=recent_sales,
-                         low_stock_items=low_stock_items)
+                         total_customers=total_customers,
+                         sales_this_week=sales_this_week,
+                         max_sales=max_sales,
+                         sales_by_payment_method=sales_by_payment_method)
 # Routes
 @app.route('/')
 def home():
@@ -221,6 +233,7 @@ def login():
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role
+            session['location_id'] = user.location_id
             print(f"Session set: {session['user_id']}, {session['username']}, {session['role']}")  # Debug print
             user.last_login = datetime.utcnow()
             db.session.commit()
@@ -240,7 +253,7 @@ def logout():
 
 
 @app.route('/products')
-@login_required('manager'and 'admin')
+@login_required(roles=['manager', 'admin'])
 def products():
     page = request.args.get('page', 1, type=int)
     dealer_id = request.args.get('dealer_id', type=int)
@@ -268,7 +281,7 @@ def products():
 
 
 @app.route('/products/<int:product_id>', methods=['DELETE'])
-@login_required('admin')
+@login_required(roles=['admin'])
 def delete_product(product_id):
     product = Product.query.get_or_404(product_id)
 
@@ -285,7 +298,7 @@ def delete_product(product_id):
     return jsonify({'message': 'Product deleted successfully!'})
 
 @app.route('/products/edit/<int:product_id>', methods=['GET', 'POST'])
-@login_required('manager' and 'admin')
+@login_required(roles=['manager', 'admin'])
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     suppliers = Supplier.query.all()
@@ -314,13 +327,70 @@ def edit_product(product_id):
     return render_template('edit_product.html', product=product, suppliers=suppliers, dealers=dealers)
 
 @app.route('/admin/users')
-@login_required('admin')
+@login_required(roles=['admin'])
 def manage_users():
     users = User.query.order_by(User.username.asc()).all()
-    return render_template('users.html', users=users)
+    locations = Location.query.all()
+    return render_template('users.html', users=users, locations=locations)
+
+@app.route('/admin/locations')
+@login_required(roles=['admin'])
+def manage_locations():
+    locations = Location.query.all()
+    return render_template('locations.html', locations=locations)
+
+@app.route('/admin/locations/add', methods=['POST'])
+@login_required(roles=['admin'])
+def add_location():
+    name = request.form['name']
+    address = request.form['address']
+    new_location = Location(name=name, address=address)
+    db.session.add(new_location)
+    db.session.commit()
+    flash('Location added successfully!', 'success')
+    return redirect(url_for('manage_locations'))
+
+@app.route('/admin/locations/edit/<int:location_id>', methods=['POST'])
+@login_required(roles=['admin'])
+def edit_location(location_id):
+    location = Location.query.get_or_404(location_id)
+    location.name = request.form['name']
+    location.address = request.form['address']
+    db.session.commit()
+    flash('Location updated successfully!', 'success')
+    return redirect(url_for('manage_locations'))
+
+@app.route('/admin/locations/delete/<int:location_id>')
+@login_required(roles=['admin'])
+def delete_location(location_id):
+    location = Location.query.get_or_404(location_id)
+    db.session.delete(location)
+    db.session.commit()
+    flash('Location deleted successfully!', 'success')
+    return redirect(url_for('manage_locations'))
+
+@app.route('/admin/reports/employee')
+@login_required(roles=['manager'])
+def employee_report():
+    users = User.query.all()
+    user_id = request.args.get('user_id', type=int)
+    sales_by_employee = []
+
+    query = db.session.query(
+        User.username,
+        func.sum(Sale.total_amount).label('total_sales'),
+        func.count(Sale.id).label('total_transactions')
+    ).join(Sale).group_by(User.username)
+
+    if user_id:
+        query = query.filter(User.id == user_id)
+
+    sales_by_employee = query.all()
+
+    return render_template('employee_report.html', users=users, sales_by_employee=sales_by_employee)
 
 @app.route('/admin/reports/supplier')
-@login_required('manager')
+@login_required(roles=['manager'])
 def supplier_report():
     suppliers = Supplier.query.all()
     supplier_id = request.args.get('supplier_id', type=int)
@@ -341,7 +411,7 @@ def supplier_report():
     return render_template('supplier_report.html', suppliers=suppliers, products=products)
 
 @app.route('/admin/reports/sales')
-@login_required('manager')
+@login_required(roles=['manager'])
 def sales_report():
     # Get filter parameters
     start_date = request.args.get('start_date')
@@ -413,12 +483,13 @@ def get_product_by_barcode(barcode):
     return jsonify({'error': 'Product not found'}), 404
 # Add user management routes
 @app.route('/admin/users/add', methods=['POST'])
-@login_required('admin')
+@login_required(roles=['admin'])
 def add_user():
     username = request.form['username']
     email = request.form['email']
     password = request.form['password']
     role = request.form['role']
+    location_id = request.form.get('location_id')
     
     if User.query.filter_by(username=username).first():
         flash('Username already exists', 'danger')
@@ -431,7 +502,8 @@ def add_user():
     new_user = User(
         username=username,
         email=email,
-        role=role
+        role=role,
+        location_id=location_id if location_id else None
     )
     new_user.set_password(password)
     
@@ -442,13 +514,14 @@ def add_user():
     return redirect(url_for('manage_users'))
 
 @app.route('/admin/users/<int:user_id>/edit', methods=['POST'])
-@login_required('admin')
+@login_required(roles=['admin'])
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     
     user.username = request.form['username']
     user.email = request.form['email']
     user.role = request.form['role']
+    user.location_id = request.form.get('location_id') if request.form.get('location_id') else None
     user.is_active = 'is_active' in request.form
     
     if request.form['password']:
@@ -460,7 +533,7 @@ def edit_user(user_id):
     return redirect(url_for('manage_users'))
 
 @app.route('/admin/users/<int:user_id>/toggle', methods=['POST'])
-@login_required('admin')
+@login_required(roles=['admin'])
 def toggle_user_status(user_id):
     if user_id == session['user_id']:
         flash('You cannot deactivate yourself', 'danger')
@@ -476,7 +549,7 @@ def toggle_user_status(user_id):
 
 
 @app.route('/products/add', methods=['GET', 'POST'])
-@login_required('manager'and 'admin')
+@login_required(roles=['manager', 'admin'])
 def add_product():
     suppliers = Supplier.query.all()
     dealers = Dealer.query.all()  # Fetch all dealers
@@ -527,7 +600,7 @@ def add_product():
 
 
 @app.route('/pos')
-@login_required()
+@login_required(roles=['cashier', 'manager', 'admin'])
 def pos():
     products = Product.query.filter(Product.current_stock > 0).all()
     customers = Customer.query.all()
@@ -546,12 +619,13 @@ def get_product(barcode):
     return jsonify({'error': 'Product not found'}), 404
 
 @app.route('/api/checkout', methods=['POST'])
-@login_required()
+@login_required(roles=['cashier', 'manager', 'admin'])
 def checkout():
     data = request.get_json()
     items = data.get('items', [])
     customer_id = data.get('customer_id')
     payment_method = data.get('payment_method', 'cash')
+    split_payment = data.get('split_payment', False)
 
     if not items:
         return jsonify({'error': 'No items in cart'}), 400
@@ -570,6 +644,7 @@ def checkout():
     total = subtotal + tax
 
     # Create sale
+    points_earned = int(total // 100)
     sale = Sale(
         receipt_number=Sale.generate_receipt_number(),
         customer_id=customer_id,
@@ -577,9 +652,18 @@ def checkout():
         subtotal=subtotal,
         tax_amount=tax,
         total_amount=total,
-        payment_method=payment_method
+        payment_method=payment_method,
+        channel='offline',
+        points_earned=points_earned,
+        split_payment=split_payment,
+        location_id=session.get('location_id')
     )
     db.session.add(sale)
+
+    if customer_id:
+        customer = Customer.query.get(customer_id)
+        if customer:
+            customer.add_loyalty_points(points_earned)
     db.session.commit()
 
     # Add sale items and update inventory
@@ -635,13 +719,13 @@ def checkout():
     })
 
 @app.route('/receipt/<receipt_number>')
-@login_required()
+@login_required(roles=['cashier', 'manager', 'admin'])
 def view_receipt(receipt_number):
     sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
     return render_template('receipt.html', sale=sale)
 
 @app.route('/receipt/<receipt_number>/delete', methods=['POST'])
-@login_required('admin')  # or 'manager', depending on your roles
+@login_required(roles=['admin'])
 def delete_receipt(receipt_number):
     sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
 
@@ -654,7 +738,7 @@ def delete_receipt(receipt_number):
     flash(f'Receipt #{receipt_number} deleted successfully.', 'success')
     return redirect(url_for('dashboard'))
 @app.route('/purchase_orders/<int:order_id>/receive', methods=['POST'])
-@login_required('manager')
+@login_required(roles=['manager'])
 def receive_purchase_order(order_id):
     purchase_order = PurchaseOrder.query.get_or_404(order_id)
 
@@ -687,7 +771,7 @@ def receive_purchase_order(order_id):
     return redirect(url_for('manage_purchase_orders'))
 
 @app.route('/purchase_orders/<int:order_id>/finalize', methods=['POST'])
-@login_required('manager')
+@login_required(roles=['manager'])
 def finalize_purchase_order(order_id):
     purchase_order = PurchaseOrder.query.get_or_404(order_id)
     # Create accounting entries for the purchase
@@ -717,7 +801,7 @@ def finalize_purchase_order(order_id):
 
 
 @app.route('/admin/inventory')
-@login_required('manager')
+@login_required(roles=['manager'])
 def inventory_management():
     # Get the selected dealer_id from the request arguments
     dealer_id = request.args.get('dealer_id', type=int)
@@ -787,14 +871,14 @@ def inventory_management():
                          net_amount=net_amount)
 
 @app.route('/suppliers')
-@login_required('manager 'and 'admin')
+@login_required(roles=['manager', 'admin'])
 def list_suppliers():
     suppliers = Supplier.query.all()
     return render_template('suppliers/list.html', suppliers=suppliers)
 
 # Route to add a new supplier
 @app.route('/suppliers/add', methods=['GET', 'POST'])
-@login_required('manager')
+@login_required(roles=['manager'])
 def add_supplier():
     if request.method == 'POST':
         name = request.form['name']
@@ -835,7 +919,7 @@ def add_supplier():
 
 # Route to edit an existing supplier
 @app.route('/suppliers/edit/<int:supplier_id>', methods=['GET', 'POST'])
-@login_required('manager')
+@login_required(roles=['manager'])
 def edit_supplier(supplier_id):
     supplier = Supplier.query.get_or_404(supplier_id)
 
@@ -860,7 +944,7 @@ def edit_supplier(supplier_id):
 
 # Route to delete a supplier
 @app.route('/suppliers/delete/<int:supplier_id>', methods=['POST'])
-@login_required('manager')
+@login_required(roles=['manager'])
 def delete_supplier(supplier_id):
     supplier = Supplier.query.get_or_404(supplier_id)
     db.session.delete(supplier)
