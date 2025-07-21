@@ -76,11 +76,21 @@
                                 <i class="fas fa-truck-loading"></i> Supplier Reports
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'employee_report' %}active{% endif %}" href="{{ url_for('employee_report') }}">
+                                <i class="fas fa-user-chart"></i> Employee Reports
+                            </a>
+                        </li>
                         {% endif %}
                         {% if session.role == 'admin' %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}" href="{{ url_for('manage_users') }}">
                                 <i class="fas fa-users-cog"></i> Users
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'manage_locations' %}active{% endif %}" href="{{ url_for('manage_locations') }}">
+                                <i class="fas fa-map-marker-alt"></i> Locations
                             </a>
                         </li>
                         {% endif %}

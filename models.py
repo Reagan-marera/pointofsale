@@ -4,6 +4,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+class Location(db.Model):
+    __tablename__ = 'locations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.Text)
+
 class User(db.Model):
     __tablename__ = 'users'
 
@@ -15,6 +22,9 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
+
+    location = db.relationship('Location', backref='users')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -25,9 +35,9 @@ class User(db.Model):
 class Product(db.Model):
     __tablename__ = 'products'
     id = db.Column(db.Integer, primary_key=True)
-    barcode = db.Column(db.String(50), unique=True)
-    name = db.Column(db.String(100), nullable=False)
-    category = db.Column(db.String(50))
+    barcode = db.Column(db.String(50), unique=True, index=True)
+    name = db.Column(db.String(100), nullable=False, index=True)
+    category = db.Column(db.String(50), index=True)
     buying_price = db.Column(db.Float, nullable=False)
     selling_price = db.Column(db.Float, nullable=False)
     current_stock = db.Column(db.Integer, default=0)
@@ -82,18 +92,23 @@ class Sale(db.Model):
     __tablename__ = 'sales'
 
     id = db.Column(db.Integer, primary_key=True)
-    receipt_number = db.Column(db.String(20), unique=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    receipt_number = db.Column(db.String(20), unique=True, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     subtotal = db.Column(db.Float, nullable=False)
     tax_amount = db.Column(db.Float, nullable=False)
     discount_amount = db.Column(db.Float, default=0.0)
     total_amount = db.Column(db.Float, nullable=False)
-    payment_method = db.Column(db.String(20), nullable=False)
+    payment_method = db.Column(db.String(20), nullable=False, index=True)
     payment_status = db.Column(db.String(20), default='completed')
-    sale_date = db.Column(db.DateTime, default=datetime.utcnow)
+    sale_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    channel = db.Column(db.String(20), default='offline')
+    points_earned = db.Column(db.Integer, default=0)
+    split_payment = db.Column(db.Boolean, default=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
 
     items = db.relationship('SaleItem', backref='sale', cascade='all, delete-orphan')
+    location = db.relationship('Location', backref='sales')
     customer = db.relationship('Customer', backref='purchases')
     user = db.relationship('User', backref='sales')
 
@@ -110,8 +125,8 @@ class SaleItem(db.Model):
     __tablename__ = 'sale_items'
 
     id = db.Column(db.Integer, primary_key=True)
-    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Float, nullable=False)
     total_price = db.Column(db.Float, nullable=False)
