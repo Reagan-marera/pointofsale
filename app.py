@@ -6,9 +6,12 @@ from sqlalchemy.orm import joinedload
 import string
 from config import Config
 from sqlalchemy import func
+from flask_migrate import Migrate
+
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
+migrate = Migrate(app, db)
 
 
 # Create tables before first request
@@ -173,7 +176,7 @@ def login_required(roles=['cashier']):
                 flash('User not found. Please log in again.', 'danger')
                 return redirect(url_for('login'))
 
-            if user.role not in roles and 'admin' not in roles:
+            if user.role not in roles and user.role != 'admin':
                 flash('You do not have permission to access this page', 'danger')
                 return redirect(url_for('dashboard'))
 
