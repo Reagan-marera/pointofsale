@@ -6,9 +6,12 @@ from sqlalchemy.orm import joinedload
 import string
 from config import Config
 from sqlalchemy import func
+from flask_migrate import Migrate
+
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
+migrate = Migrate(app, db)
 
 
 # Create tables before first request
