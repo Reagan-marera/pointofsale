@@ -83,15 +83,6 @@ def register():
             return jsonify({'message': 'Registration available', 'status': 'success'}), 200
         return render_template('register.html')
     
-    # For subsequent registrations, only allow admins
-    if 'user_id' not in session or session.get('role') != 'admin':
-        if is_api_request:
-            return jsonify({
-                'message': 'Only administrators can register new users',
-                'status': 'error'
-            }), 403
-        flash('Only administrators can register new users', 'danger')
-        return redirect(url_for('login'))
     
     if request.method == 'POST':
         try:
@@ -187,7 +178,7 @@ def login_required(roles=['cashier']):
 
 # Update the dashboard route
 @app.route('/dashboard')
-@login_required()
+@login_required(roles=['cashier', 'manager', 'admin'])
 def dashboard():
     # Get basic stats for dashboard
     total_products = Product.query.count()
