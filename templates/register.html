@@ -37,6 +37,10 @@
                             <option value="admin">Admin</option>
                         </select>
                     </div>
+                    <div class="mb-3" id="secret-password-field" style="display: none;">
+                        <label for="secret_password" class="form-label">Secret Password</label>
+                        <input type="password" class="form-control" id="secret_password" name="secret_password">
+                    </div>
                     {% endif %}
                     
                     <button type="submit" class="btn btn-primary w-100">
@@ -51,4 +55,17 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('role').addEventListener('change', function () {
+        let secretPasswordField = document.getElementById('secret-password-field');
+        if (this.value === 'admin' || this.value === 'manager') {
+            secretPasswordField.style.display = 'block';
+        } else {
+            secretPasswordField.style.display = 'none';
+        }
+    });
+</script>
 {% endblock %}
