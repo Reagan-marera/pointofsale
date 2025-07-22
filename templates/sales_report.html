@@ -104,13 +104,6 @@
                         <td>{{ sale.customer.name if sale.customer else 'Walk-in' }}</td>
                         <td class="text-end">KSh {{ "%.2f"|format(sale.subtotal) }}</td>
                         <td class="text-end">KSh {{ "%.2f"|format(sale.tax_amount) }}</td>
-                        <td>
-                            {% for item in sale.items %}
-                                {% for barcode in item.product.barcodes %}
-                                    {{ barcode }}<br>
-                                {% endfor %}
-                            {% endfor %}
-                        </td>
                         <td class="text-end">KSh {{ "%.2f"|format(sale.total_amount) }}</td>
                         <td>{{ sale.payment_method|capitalize }}</td>
                         <td>
