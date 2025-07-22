@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const newSaleBtn = document.getElementById('new-sale-btn');
     const printReceiptBtn = document.getElementById('print-receipt-btn');
     const productSearch = document.getElementById('product-search');
+    const productList = document.getElementById('product-list');
     
     // Event Listeners
     barcodeInput.addEventListener('keypress', function(e) {
@@ -25,9 +26,32 @@ document.addEventListener('DOMContentLoaded', function() {
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
-    productSearch.addEventListener('change', function() {
-        barcodeInput.value = this.value;
-        scanProduct();
+
+    productSearch.addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase();
+        if (searchTerm.length < 2) {
+            productList.innerHTML = '';
+            return;
+        }
+
+        fetch(`/api/products?search=${searchTerm}`)
+            .then(response => response.json())
+            .then(products => {
+                productList.innerHTML = '';
+                products.forEach(product => {
+                    const item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action';
+                    item.textContent = `${product.name} (${product.barcode})`;
+                    item.addEventListener('click', function() {
+                        barcodeInput.value = product.barcode;
+                        scanProduct();
+                        productList.innerHTML = '';
+                        productSearch.value = '';
+                    });
+                    productList.appendChild(item);
+                });
+            });
     });
     
     // Functions
