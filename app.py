@@ -390,6 +390,21 @@ def employee_report():
 
     return render_template('employee_report.html', users=users, sales_by_employee=sales_by_employee)
 
+@app.route('/admin/reports/daily')
+@login_required(roles=['manager'])
+def daily_report():
+    date_str = request.args.get('date')
+    if date_str:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    else:
+        date = datetime.today().date()
+
+    total_sales = db.session.query(func.sum(Sale.total_amount)).filter(func.date(Sale.sale_date) == date).scalar() or 0
+    total_expenses = db.session.query(func.sum(Expense.amount)).filter(func.date(Expense.date) == date).scalar() or 0
+    net_profit = total_sales - total_expenses
+
+    return render_template('daily_report.html', total_sales=total_sales, total_expenses=total_expenses, net_profit=net_profit)
+
 @app.route('/admin/reports/supplier')
 @login_required(roles=['manager'])
 def supplier_report():
@@ -442,10 +457,6 @@ def sales_report():
     
     # Get sales data
     sales = query.order_by(Sale.sale_date.desc()).limit(50).all()
-
-    for sale in sales:
-        for item in sale.items:
-            item.product.barcodes = [p.barcode for p in Product.query.filter_by(name=item.product.name).all()]
     
     # Calculate totals
     total_sales = sum(sale.total_amount for sale in sales) if sales else 0
@@ -464,7 +475,7 @@ def sales_report():
     payment_method_data = [float(method[2]) for method in sales_by_method]
     
     return render_template('sales_report.html',
-                        sales=sales,
+                        products=products,
                         total_sales=total_sales,
                         total_transactions=total_transactions,
                         average_sale=average_sale,
@@ -611,17 +622,15 @@ def pos():
     customers = Customer.query.all()
     return render_template('pos.html', products=products, customers=customers)
 
-@app.route('/api/products/<barcode>')
-def get_product(barcode):
-    product = Product.query.filter_by(barcode=barcode).first()
-    if product:
-        return jsonify({
-            'id': product.id,
-            'name': product.name,
-            'price': product.selling_price,
-            'stock': product.current_stock
-        })
-    return jsonify({'error': 'Product not found'}), 404
+@app.route('/api/products')
+def get_products():
+    search = request.args.get('search')
+    if search:
+        products = Product.query.filter(Product.name.ilike(f'%{search}%')).all()
+    else:
+        products = Product.query.all()
+
+    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode} for p in products])
 
 @app.route('/api/checkout', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
