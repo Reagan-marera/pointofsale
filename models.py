@@ -268,3 +268,14 @@ class FinancierDebit(db.Model):
 
     def __repr__(self):
         return f'<FinancierDebit {self.transaction_ref}>'
+
+class OTP(db.Model):
+    __tablename__ = 'otps'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), nullable=False)
+    otp = db.Column(db.String(6), nullable=False)
+    expiry = db.Column(db.DateTime, nullable=False)
+
+    def __repr__(self):
+        return f'<OTP {self.email}>'
