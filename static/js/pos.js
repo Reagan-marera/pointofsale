@@ -61,27 +61,21 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please enter a barcode');
             return;
         }
-        
+
         fetch(`/api/products/${encodeURIComponent(barcode)}`)
             .then(response => {
-                if (!response.ok) {
+                if (response.ok) {
+                    return response.json();
+                } else {
                     throw new Error('Product not found');
                 }
-                return response.json();
             })
             .then(product => {
                 if (product.error) {
                     alert(product.error);
-                    return;
+                } else {
+                    addToCart(product);
                 }
-                
-                // Check stock
-                if (product.stock < 1) {
-                    alert('Product out of stock');
-                    return;
-                }
-                
-                addToCart(product);
                 barcodeInput.value = '';
                 barcodeInput.focus();
             })

@@ -475,7 +475,7 @@ def sales_report():
     payment_method_data = [float(method[2]) for method in sales_by_method]
     
     return render_template('sales_report.html',
-                        products=products,
+                        sales=sales,
                         total_sales=total_sales,
                         total_transactions=total_transactions,
                         average_sale=average_sale,
