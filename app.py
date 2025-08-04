@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Customer, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit
+from models import db,  User, Product, Customer, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP
 from datetime import datetime,timedelta
 import random
 from sqlalchemy.orm import joinedload
