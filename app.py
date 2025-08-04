@@ -6,7 +6,7 @@ import random
 from sqlalchemy.orm import joinedload
 import string
 from config import Config
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from flask_migrate import Migrate
 
 app = Flask(__name__)
@@ -258,6 +258,7 @@ def logout():
 def products():
     page = request.args.get('page', 1, type=int)
     dealer_id = request.args.get('dealer_id', type=int)
+    product_search = request.args.get('product_search')
 
     # Create a base query with joined loads for supplier and dealer
     query = Product.query.options(joinedload(Product.supplier), joinedload(Product.dealer)).order_by(Product.name.asc())
@@ -265,6 +266,14 @@ def products():
     # Apply dealer filter if dealer_id is provided
     if dealer_id:
         query = query.filter(Product.dealer_id == dealer_id)
+
+    if product_search:
+        query = query.filter(
+            or_(
+                Product.name.ilike(f'%{product_search}%'),
+                Product.barcode.ilike(f'%{product_search}%')
+            )
+        )
 
     # Paginate the results
     products = query.paginate(page=page, per_page=10)
@@ -626,7 +635,12 @@ def pos():
 def get_products():
     search = request.args.get('search')
     if search:
-        products = Product.query.filter(Product.name.ilike(f'%{search}%')).all()
+        products = Product.query.filter(
+            or_(
+                Product.name.ilike(f'%{search}%'),
+                Product.barcode.ilike(f'%{search}%')
+            )
+        ).all()
     else:
         products = Product.query.all()
 
@@ -819,13 +833,14 @@ def finalize_purchase_order(order_id):
 def inventory_management():
     # Get the selected dealer_id from the request arguments
     dealer_id = request.args.get('dealer_id', type=int)
+    product_search = request.args.get('product_search')
 
     # Fetch all dealers for the filter dropdown
     dealers = Dealer.query.all()
 
     # Base queries with dealer filtering
     products_query = Product.query
-    movements_query = InventoryMovement.query
+    movements_query = InventoryMovement.query.join(Product)
     purchase_orders_query = PurchaseOrder.query
     sale_items_query = SaleItem.query
 
@@ -833,7 +848,7 @@ def inventory_management():
         # Apply dealer filter to all queries
         products_query = products_query.filter(Product.dealer_id == dealer_id)
         
-        movements_query = movements_query.join(Product).filter(Product.dealer_id == dealer_id)
+        movements_query = movements_query.filter(Product.dealer_id == dealer_id)
         
         purchase_orders_query = purchase_orders_query.join(
             PurchaseOrderItem
@@ -844,6 +859,14 @@ def inventory_management():
         ).distinct()
         
         sale_items_query = sale_items_query.join(Product).filter(Product.dealer_id == dealer_id)
+
+    if product_search:
+        movements_query = movements_query.filter(
+            or_(
+                Product.name.ilike(f'%{product_search}%'),
+                Product.barcode.ilike(f'%{product_search}%')
+            )
+        )
 
     # Execute queries
     products = products_query.all()
