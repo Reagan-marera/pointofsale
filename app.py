@@ -10,6 +10,8 @@ from sqlalchemy import func, or_
 from flask_migrate import Migrate
 
 app = Flask(__name__)
+application = app  
+
 app.config.from_object(Config)
 db.init_app(app)
 migrate = Migrate(app, db)
