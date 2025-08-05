@@ -28,12 +28,15 @@
                         <i class="fas fa-barcode"></i> Scan
                     </button>
                 </div>
-<div id="scanner-container" style="height: 300px; display: none;"></div>
-                <div class="mb-3">
-                    <label for="product-search" class="form-label">Or search for a product</label>
-                    <input type="text" class="form-control" id="product-search" placeholder="Search by name...">
-                    <div id="product-list" class="list-group mt-2"></div>
-                </div>
+                <form action="{{ url_for('products') }}" method="get">
+                    <div class="mb-3">
+                        <label for="product-search" class="form-label">Or search for a product</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="product-search" name="product_search" placeholder="Search by name...">
+                            <button class="btn btn-primary" type="submit">Search</button>
+                        </div>
+                    </div>
+                </form>
                 
                 <div class="table-responsive">
                     <table class="table table-sm" id="cart-table">
@@ -120,6 +123,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/quagga/quagga.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pos.js') }}"></script>
 {% endblock %}
