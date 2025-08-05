@@ -38,19 +38,22 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(products => {
                 productList.innerHTML = '';
-                products.forEach(product => {
-                    const item = document.createElement('a');
-                    item.href = '#';
-                    item.className = 'list-group-item list-group-item-action';
-                    item.textContent = `${product.name} (${product.barcode})`;
-                    item.addEventListener('click', function() {
-                        barcodeInput.value = product.barcode;
-                        scanProduct();
-                        productList.innerHTML = '';
-                        productSearch.value = '';
+                if (products.length > 0) {
+                    products.forEach(product => {
+                        const item = document.createElement('a');
+                        item.href = '#';
+                        item.className = 'list-group-item list-group-item-action';
+                        item.textContent = `${product.name} (${product.barcode}) - KSh ${product.selling_price.toFixed(2)}`;
+                        item.addEventListener('click', function() {
+                            addToCart(product);
+                            productList.innerHTML = '';
+                            productSearch.value = '';
+                        });
+                        productList.appendChild(item);
                     });
-                    productList.appendChild(item);
-                });
+                } else {
+                    productList.innerHTML = '<a href="#" class="list-group-item list-group-item-action disabled">No products found.</a>';
+                }
             });
     });
     
