@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const cart = [];
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
     let customerId = null;
     
     // DOM Elements
@@ -27,35 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
 
-    productSearch.addEventListener('keyup', function() {
-        const searchTerm = this.value.toLowerCase();
-        if (searchTerm.length < 2) {
-            productList.innerHTML = '';
-            return;
-        }
-
-        fetch(`/api/products?search=${searchTerm}`)
-            .then(response => response.json())
-            .then(products => {
-                productList.innerHTML = '';
-                if (products.length > 0) {
-                    products.forEach(product => {
-                        const item = document.createElement('a');
-                        item.href = '#';
-                        item.className = 'list-group-item list-group-item-action';
-                        item.textContent = `${product.name} (${product.barcode}) - KSh ${product.selling_price.toFixed(2)}`;
-                        item.addEventListener('click', function() {
-                            addToCart(product);
-                            productList.innerHTML = '';
-                            productSearch.value = '';
-                        });
-                        productList.appendChild(item);
-                    });
-                } else {
-                    productList.innerHTML = '<a href="#" class="list-group-item list-group-item-action disabled">No products found.</a>';
-                }
-            });
-    });
     
     // Functions
     function scanProduct() {
@@ -144,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     
     function updateCartDisplay() {
+        localStorage.setItem('cart', JSON.stringify(cart));
         cartItems.innerHTML = '';
         let subtotal = 0;
         
@@ -280,10 +252,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         cart.length = 0;
+        localStorage.removeItem('cart');
         customerId = null;
         document.getElementById('customer-search').value = '';
         document.getElementById('cash').checked = true;
         updateCartDisplay();
         barcodeInput.focus();
     }
+
+    updateCartDisplay();
 });
