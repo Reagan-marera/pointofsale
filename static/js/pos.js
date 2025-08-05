@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const barcodeInput = document.getElementById('barcode-input');
     const scanBtn = document.getElementById('scan-btn');
-    const scannerContainer = document.getElementById('scanner-container');
     const cartItems = document.getElementById('cart-items');
     const subtotalEl = document.getElementById('subtotal');
     const taxEl = document.getElementById('tax');
@@ -13,89 +12,145 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkoutBtn = document.getElementById('checkout-btn');
     const newSaleBtn = document.getElementById('new-sale-btn');
     const printReceiptBtn = document.getElementById('print-receipt-btn');
-    const productSearch = document.getElementById('product-search');
-    const productList = document.getElementById('product-list');
+    const productSearchInput = document.getElementById('product-search-input');
+    const productSearchBtn = document.getElementById('product-search-btn');
+    const productSearchResults = document.getElementById('product-search-results');
     
     // Event Listeners
-    barcodeInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            scanProduct();
+    scanBtn.addEventListener('click', function() {
+        if (Quagga.isExecuting) {
+            Quagga.stop();
+        } else {
+            startScanner();
         }
     });
-    
-    scanBtn.addEventListener('click', function() {
-        const barcode = barcodeInput.value.trim();
-        if (barcode) {
-            scanProduct();
-        } else {
-            if (scannerContainer.style.display === 'none') {
-                scannerContainer.style.display = 'block';
-                Quagga.init({
-                    inputStream : {
-                        name : "Live",
-                        type : "LiveStream",
-                        target: scannerContainer
-                    },
-                    decoder : {
-                        readers : ["code_128_reader"]
-                    }
-                }, function(err) {
-                    if (err) {
-                        console.log(err);
-                        return
-                    }
-                    console.log("Initialization finished. Ready to start");
-                    Quagga.start();
-                });
-                Quagga.onDetected(function(result) {
-                    barcodeInput.value = result.codeResult.code;
-                    scannerContainer.style.display = 'none';
-                    Quagga.stop();
-                    scanProduct(); // Call scanProduct after detection
-                });
-            } else {
-                scannerContainer.style.display = 'none';
-                Quagga.stop();
-            }
+
+    barcodeInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            scanProduct(barcodeInput.value);
         }
     });
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
 
-    productSearch.addEventListener('keyup', function() {
-        const searchTerm = this.value.toLowerCase();
+    productSearchBtn.addEventListener('click', searchProducts);
+    productSearchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchProducts();
+        }
+    });
+
+    // Functions
+    function startScanner() {
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#barcode-scanner'),
+                constraints: {
+                    width: 480,
+                    height: 320,
+                    facingMode: "environment"
+                },
+            },
+            decoder: {
+                readers: [
+                    "code_128_reader",
+                    "ean_reader",
+                    "ean_8_reader",
+                    "code_39_reader",
+                    "code_39_vin_reader",
+                    "codabar_reader",
+                    "upc_reader",
+                    "upc_e_reader",
+                    "i2of5_reader"
+                ],
+                debug: {
+                    showCanvas: true,
+                    showPatches: true,
+                    showFoundPatches: true,
+                    showSkeleton: true,
+                    showLabels: true,
+                    showFoundLabels: true,
+                    showImage: true,
+                    drawBoundingBox: true,
+                    drawScanline: true,
+                    showPattern: true
+                }
+            },
+        }, function (err) {
+            if (err) {
+                console.log(err);
+                return;
+            }
+            console.log("Initialization finished. Ready to start");
+            Quagga.start();
+        });
+
+        Quagga.onProcessed(function (result) {
+            var drawingCtx = Quagga.canvas.ctx.overlay,
+                drawingCanvas = Quagga.canvas.dom.overlay;
+
+            if (result) {
+                if (result.boxes) {
+                    drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute("width")), parseInt(drawingCanvas.getAttribute("height")));
+                    result.boxes.filter(function (box) {
+                        return box !== result.box;
+                    }).forEach(function (box) {
+                        Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, { color: "green", lineWidth: 2 });
+                    });
+                }
+
+                if (result.box) {
+                    Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: "#00F", lineWidth: 2 });
+                }
+
+                if (result.codeResult && result.codeResult.code) {
+                    Quagga.ImageDebug.drawPath(result.line, { x: 'x', y: 'y' }, drawingCtx, { color: 'red', lineWidth: 3 });
+                }
+            }
+        });
+
+        Quagga.onDetected(function (result) {
+            scanProduct(result.codeResult.code);
+            Quagga.stop();
+        });
+    }
+
+    function searchProducts() {
+        const searchTerm = productSearchInput.value.trim();
         if (searchTerm.length < 2) {
-            productList.innerHTML = '';
+            alert('Please enter at least 2 characters to search.');
             return;
         }
 
         fetch(`/api/products?search=${searchTerm}`)
             .then(response => response.json())
             .then(products => {
-                productList.innerHTML = '';
-                if (products.length > 0) {
-                    products.forEach(product => {
-                        const item = document.createElement('a');
-                        item.href = '#';
-                        item.className = 'list-group-item list-group-item-action';
-                        item.textContent = `${product.name} (${product.barcode}) - KSh ${product.selling_price.toFixed(2)}`;
-                        item.addEventListener('click', function() {
-                            addToCart(product);
-                            productList.innerHTML = '';
-                            productSearch.value = '';
-                        });
-                        productList.appendChild(item);
-                    });
-                } else {
-                    productList.innerHTML = '<a href="#" class="list-group-item list-group-item-action disabled">No products found.</a>';
+                productSearchResults.innerHTML = '';
+                if (products.length === 0) {
+                    productSearchResults.innerHTML = '<div class="list-group-item">No products found.</div>';
+                    return;
                 }
+
+                products.forEach(product => {
+                    const item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action';
+                    item.textContent = `${product.name} (${product.barcode}) - KSh ${product.selling_price}`;
+                    item.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        addToCart(product);
+                        productSearchResults.innerHTML = '';
+                        productSearchInput.value = '';
+                    });
+                    productSearchResults.appendChild(item);
+                });
             });
-    });
-    
-    // Functions
-    function scanProduct() {
-        const barcode = barcodeInput.value.trim();
+    }
+
+    function scanProduct(barcode) {
         if (!barcode) {
             alert('Please enter a barcode');
             return;
