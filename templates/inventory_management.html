@@ -109,12 +109,6 @@
             <h5>Recent Inventory Movements</h5>
         </div>
         <div class="card-body">
-            <form method="GET" action="{{ url_for('inventory_management') }}" class="mb-3">
-                <div class="input-group">
-                    <input type="text" class="form-control" placeholder="Search by product name or barcode" name="product_search" value="{{ request.args.get('product_search', '') }}">
-                    <button class="btn btn-primary" type="submit">Search</button>
-                </div>
-            </form>
             <div class="table-responsive">
                 <table class="table table-striped table-hover align-middle">
                     <thead class="table-dark">
