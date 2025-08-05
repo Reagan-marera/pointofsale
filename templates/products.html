@@ -13,12 +13,31 @@
         </div>
     </div>
 
-    <form method="GET" action="{{ url_for('products') }}" class="mb-3">
-        <div class="input-group">
-            <input type="text" class="form-control" placeholder="Search by product name or barcode" name="product_search" value="{{ request.args.get('product_search', '') }}">
-            <button class="btn btn-primary" type="submit">Search</button>
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('products') }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="product_search" class="form-label">Search by Name or Barcode</label>
+                    <input type="text" class="form-control" id="product_search" name="product_search" value="{{ request.args.get('product_search', '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="dealer_id" class="form-label">Filter by Dealer</label>
+                    <select class="form-select" id="dealer_id" name="dealer_id">
+                        <option value="">All Dealers</option>
+                        {% for dealer in dealers %}
+                        <option value="{{ dealer.id }}" {% if dealer.id|string == request.args.get('dealer_id') %}selected{% endif %}>
+                            {{ dealer.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-striped table-hover align-middle">
             <thead class="table-dark">

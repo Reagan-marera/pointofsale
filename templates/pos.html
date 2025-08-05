@@ -22,18 +22,18 @@
                 <h5>Scan Products</h5>
             </div>
             <div class="card-body">
+                <div id="barcode-scanner" class="viewport"></div>
                 <div class="input-group mb-3">
                     <input type="text" class="form-control" id="barcode-input" placeholder="Scan barcode..." autofocus>
                     <button class="btn btn-primary" type="button" id="scan-btn">
                         <i class="fas fa-barcode"></i> Scan
                     </button>
                 </div>
-<div id="scanner-container" style="height: 300px; display: none;"></div>
-                <div class="mb-3">
-                    <label for="product-search" class="form-label">Or search for a product</label>
-                    <input type="text" class="form-control" id="product-search" placeholder="Search by name...">
-                    <div id="product-list" class="list-group mt-2"></div>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="product-search-input" placeholder="Search for a product...">
+                    <button class="btn btn-info" type="button" id="product-search-btn">Search</button>
                 </div>
+                <div id="product-search-results" class="list-group mt-2"></div>
                 
                 <div class="table-responsive">
                     <table class="table table-sm" id="cart-table">
@@ -120,6 +120,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/quagga/quagga.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
 <script src="{{ url_for('static', filename='js/pos.js') }}"></script>
 {% endblock %}
