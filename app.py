@@ -492,6 +492,19 @@ def sales_report():
                         payment_method_labels=payment_method_labels,
                         payment_method_data=payment_method_data)
 
+@app.route('/api/products/id/<int:product_id>')
+def get_product_by_id(product_id):
+    product = Product.query.get_or_404(product_id)
+    return jsonify({
+        'id': product.id,
+        'barcode': product.barcode,
+        'name': product.name,
+        'price': product.selling_price,
+        'stock': product.current_stock,
+        'tax_rate': product.tax_rate,
+        'vatable': product.vatable
+    })
+
 @app.route('/api/products/<barcode>')
 def get_product_by_barcode(barcode):
     product = Product.query.filter_by(barcode=barcode).first()
@@ -634,7 +647,8 @@ def pos():
 @app.route('/api/products')
 def get_products():
     search = request.args.get('search')
-    query = Product.query
+    query = Product.query.join(PurchaseOrderItem).distinct()
+
     if search:
         query = query.filter(
             or_(

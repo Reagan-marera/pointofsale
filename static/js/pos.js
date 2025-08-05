@@ -1,6 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     const cart = [];
     let customerId = null;
+
+    const selectedProduct = sessionStorage.getItem('selectedProduct');
+    if (selectedProduct) {
+        addToCart(JSON.parse(selectedProduct));
+        sessionStorage.removeItem('selectedProduct');
+    }
     
     // DOM Elements
     const barcodeInput = document.getElementById('barcode-input');
@@ -12,16 +18,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkoutBtn = document.getElementById('checkout-btn');
     const newSaleBtn = document.getElementById('new-sale-btn');
     const printReceiptBtn = document.getElementById('print-receipt-btn');
-    const productSearchInput = document.getElementById('product-search-input');
-    const productSearchBtn = document.getElementById('product-search-btn');
-    const productSearchResults = document.getElementById('product-search-results');
-    
     // Event Listeners
     scanBtn.addEventListener('click', function() {
-        if (Quagga.isExecuting) {
-            Quagga.stop();
+        const barcode = barcodeInput.value.trim();
+        if (barcode) {
+            scanProduct(barcode);
         } else {
-            startScanner();
+            if (Quagga.isExecuting) {
+                Quagga.stop();
+            } else {
+                startScanner();
+            }
         }
     });
 
@@ -33,13 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
-
-    productSearchBtn.addEventListener('click', searchProducts);
-    productSearchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            searchProducts();
-        }
-    });
 
     // Functions
     function startScanner() {
@@ -116,38 +116,6 @@ document.addEventListener('DOMContentLoaded', function() {
             scanProduct(result.codeResult.code);
             Quagga.stop();
         });
-    }
-
-    function searchProducts() {
-        const searchTerm = productSearchInput.value.trim();
-        if (searchTerm.length < 2) {
-            alert('Please enter at least 2 characters to search.');
-            return;
-        }
-
-        fetch(`/api/products?search=${searchTerm}`)
-            .then(response => response.json())
-            .then(products => {
-                productSearchResults.innerHTML = '';
-                if (products.length === 0) {
-                    productSearchResults.innerHTML = '<div class="list-group-item">No products found.</div>';
-                    return;
-                }
-
-                products.forEach(product => {
-                    const item = document.createElement('a');
-                    item.href = '#';
-                    item.className = 'list-group-item list-group-item-action';
-                    item.textContent = `${product.name} (${product.barcode}) - KSh ${product.selling_price}`;
-                    item.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        addToCart(product);
-                        productSearchResults.innerHTML = '';
-                        productSearchInput.value = '';
-                    });
-                    productSearchResults.appendChild(item);
-                });
-            });
     }
 
     function scanProduct(barcode) {
