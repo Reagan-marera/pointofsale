@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const barcodeInput = document.getElementById('barcode-input');
     const scanBtn = document.getElementById('scan-btn');
+    const scannerContainer = document.getElementById('scanner-container');
     const cartItems = document.getElementById('cart-items');
     const subtotalEl = document.getElementById('subtotal');
     const taxEl = document.getElementById('tax');
