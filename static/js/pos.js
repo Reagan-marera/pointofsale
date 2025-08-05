@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const barcodeInput = document.getElementById('barcode-input');
     const scanBtn = document.getElementById('scan-btn');
-    const scannerContainer = document.getElementById('scanner-container');
     const cartItems = document.getElementById('cart-items');
     const subtotalEl = document.getElementById('subtotal');
     const taxEl = document.getElementById('tax');
@@ -15,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const printReceiptBtn = document.getElementById('print-receipt-btn');
     const productSearch = document.getElementById('product-search');
     const productList = document.getElementById('product-list');
+    const productSearchForm = document.getElementById('product-search-form');
     
     // Event Listeners
     barcodeInput.addEventListener('keypress', function(e) {
@@ -24,42 +24,48 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     scanBtn.addEventListener('click', function() {
-        if (scannerContainer.style.display === 'none') {
-            scannerContainer.style.display = 'block';
-            Quagga.init({
-                inputStream : {
-                    name : "Live",
-                    type : "LiveStream",
-                    target: scannerContainer
-                },
-                decoder : {
-                    readers : ["code_128_reader"]
-                }
-            }, function(err) {
-                if (err) {
-                    console.log(err);
-                    return
-                }
-                console.log("Initialization finished. Ready to start");
-                Quagga.start();
-            });
-            Quagga.onDetected(function(result) {
-                barcodeInput.value = result.codeResult.code;
+        const barcode = barcodeInput.value.trim();
+        if (barcode) {
+            scanProduct();
+        } else {
+            if (scannerContainer.style.display === 'none') {
+                scannerContainer.style.display = 'block';
+                Quagga.init({
+                    inputStream : {
+                        name : "Live",
+                        type : "LiveStream",
+                        target: scannerContainer
+                    },
+                    decoder : {
+                        readers : ["code_128_reader"]
+                    }
+                }, function(err) {
+                    if (err) {
+                        console.log(err);
+                        return
+                    }
+                    console.log("Initialization finished. Ready to start");
+                    Quagga.start();
+                });
+                Quagga.onDetected(function(result) {
+                    barcodeInput.value = result.codeResult.code;
+                    scannerContainer.style.display = 'none';
+                    Quagga.stop();
+                    scanProduct(); // Call scanProduct after detection
+                });
+            } else {
                 scannerContainer.style.display = 'none';
                 Quagga.stop();
-                scanProduct(); // Call scanProduct after detection
-            });
-        } else {
-            scannerContainer.style.display = 'none';
-            Quagga.stop();
+            }
         }
     });
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
 
-    productSearch.addEventListener('keyup', function() {
-        const searchTerm = this.value.toLowerCase();
+    productSearchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const searchTerm = productSearch.value.toLowerCase();
         if (searchTerm.length < 2) {
             productList.innerHTML = '';
             return;
