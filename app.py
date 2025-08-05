@@ -634,15 +634,16 @@ def pos():
 @app.route('/api/products')
 def get_products():
     search = request.args.get('search')
+    query = Product.query.join(InventoryMovement).filter(InventoryMovement.movement_type == 'purchase')
     if search:
-        products = Product.query.filter(
+        query = query.filter(
             or_(
                 Product.name.ilike(f'%{search}%'),
                 Product.barcode.ilike(f'%{search}%')
             )
-        ).all()
-    else:
-        products = Product.query.all()
+        )
+
+    products = query.distinct().all()
 
     return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'selling_price': p.selling_price} for p in products])
 
