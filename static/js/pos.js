@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const barcodeInput = document.getElementById('barcode-input');
     const scanBtn = document.getElementById('scan-btn');
-    const scannerContainer = document.getElementById('scanner-container');
     const cartItems = document.getElementById('cart-items');
     const subtotalEl = document.getElementById('subtotal');
     const taxEl = document.getElementById('tax');
@@ -23,42 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    scanBtn.addEventListener('click', function() {
-        const barcode = barcodeInput.value.trim();
-        if (barcode) {
-            scanProduct();
-        } else {
-            if (scannerContainer.style.display === 'none') {
-                scannerContainer.style.display = 'block';
-                Quagga.init({
-                    inputStream : {
-                        name : "Live",
-                        type : "LiveStream",
-                        target: scannerContainer
-                    },
-                    decoder : {
-                        readers : ["code_128_reader"]
-                    }
-                }, function(err) {
-                    if (err) {
-                        console.log(err);
-                        return
-                    }
-                    console.log("Initialization finished. Ready to start");
-                    Quagga.start();
-                });
-                Quagga.onDetected(function(result) {
-                    barcodeInput.value = result.codeResult.code;
-                    scannerContainer.style.display = 'none';
-                    Quagga.stop();
-                    scanProduct(); // Call scanProduct after detection
-                });
-            } else {
-                scannerContainer.style.display = 'none';
-                Quagga.stop();
-            }
-        }
-    });
+    scanBtn.addEventListener('click', scanProduct);
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
