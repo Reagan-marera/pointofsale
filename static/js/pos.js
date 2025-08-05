@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const barcodeInput = document.getElementById('barcode-input');
     const scanBtn = document.getElementById('scan-btn');
-    const scannerContainer = document.getElementById('scanner-container');
     const cartItems = document.getElementById('cart-items');
     const subtotalEl = document.getElementById('subtotal');
     const taxEl = document.getElementById('tax');
@@ -15,7 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const printReceiptBtn = document.getElementById('print-receipt-btn');
     const productSearch = document.getElementById('product-search');
     const productList = document.getElementById('product-list');
-    const productSearchForm = document.getElementById('product-search-form');
     
     // Event Listeners
     barcodeInput.addEventListener('keypress', function(e) {
@@ -24,49 +22,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    scanBtn.addEventListener('click', function() {
-        const barcode = barcodeInput.value.trim();
-        if (barcode) {
-            scanProduct();
-        } else {
-            if (scannerContainer.style.display === 'none') {
-                scannerContainer.style.display = 'block';
-                Quagga.init({
-                    inputStream : {
-                        name : "Live",
-                        type : "LiveStream",
-                        target: scannerContainer
-                    },
-                    decoder : {
-                        readers : ["code_128_reader"]
-                    }
-                }, function(err) {
-                    if (err) {
-                        console.log(err);
-                        return
-                    }
-                    console.log("Initialization finished. Ready to start");
-                    Quagga.start();
-                });
-                Quagga.onDetected(function(result) {
-                    barcodeInput.value = result.codeResult.code;
-                    scannerContainer.style.display = 'none';
-                    Quagga.stop();
-                    scanProduct(); // Call scanProduct after detection
-                });
-            } else {
-                scannerContainer.style.display = 'none';
-                Quagga.stop();
-            }
-        }
-    });
+    scanBtn.addEventListener('click', scanProduct);
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
 
-    productSearchForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const searchTerm = productSearch.value.toLowerCase();
+    productSearch.addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase();
         if (searchTerm.length < 2) {
             productList.innerHTML = '';
             return;
@@ -76,46 +38,19 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(products => {
                 productList.innerHTML = '';
-                if (products.length > 0) {
-                    const table = document.createElement('table');
-                    table.className = 'table table-striped table-hover';
-                    const thead = document.createElement('thead');
-                    thead.innerHTML = `
-                        <tr>
-                            <th>Name</th>
-                            <th>Barcode</th>
-                            <th>Price</th>
-                            <th>Action</th>
-                        </tr>
-                    `;
-                    table.appendChild(thead);
-                    const tbody = document.createElement('tbody');
-                    products.forEach(product => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${product.name}</td>
-                            <td>${product.barcode}</td>
-                            <td>KSh ${product.selling_price.toFixed(2)}</td>
-                            <td>
-                                <button class="btn btn-sm btn-primary select-product-btn" data-barcode="${product.barcode}">Select</button>
-                            </td>
-                        `;
-                        tbody.appendChild(row);
+                products.forEach(product => {
+                    const item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action';
+                    item.textContent = `${product.name} (${product.barcode})`;
+                    item.addEventListener('click', function() {
+                        barcodeInput.value = product.barcode;
+                        scanProduct();
+                        productList.innerHTML = '';
+                        productSearch.value = '';
                     });
-                    table.appendChild(tbody);
-                    productList.appendChild(table);
-
-                    document.querySelectorAll('.select-product-btn').forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            barcodeInput.value = this.dataset.barcode;
-                            scanProduct();
-                            productList.innerHTML = '';
-                            productSearch.value = '';
-                        });
-                    });
-                } else {
-                    productList.innerHTML = '<p class="text-muted">No products found.</p>';
-                }
+                    productList.appendChild(item);
+                });
             });
     });
     
