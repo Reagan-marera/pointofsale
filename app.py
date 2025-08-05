@@ -644,7 +644,7 @@ def get_products():
     else:
         products = Product.query.all()
 
-    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode} for p in products])
+    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'selling_price': p.selling_price} for p in products])
 
 @app.route('/api/checkout', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
