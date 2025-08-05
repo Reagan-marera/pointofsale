@@ -1,10 +1,11 @@
 document.addEventListener('DOMContentLoaded', function() {
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    const cart = [];
     let customerId = null;
     
     // DOM Elements
     const barcodeInput = document.getElementById('barcode-input');
     const scanBtn = document.getElementById('scan-btn');
+    const scannerContainer = document.getElementById('scanner-container');
     const cartItems = document.getElementById('cart-items');
     const subtotalEl = document.getElementById('subtotal');
     const taxEl = document.getElementById('tax');
@@ -22,11 +23,75 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    scanBtn.addEventListener('click', scanProduct);
+    scanBtn.addEventListener('click', function() {
+        const barcode = barcodeInput.value.trim();
+        if (barcode) {
+            scanProduct();
+        } else {
+            if (scannerContainer.style.display === 'none') {
+                scannerContainer.style.display = 'block';
+                Quagga.init({
+                    inputStream : {
+                        name : "Live",
+                        type : "LiveStream",
+                        target: scannerContainer
+                    },
+                    decoder : {
+                        readers : ["code_128_reader"]
+                    }
+                }, function(err) {
+                    if (err) {
+                        console.log(err);
+                        return
+                    }
+                    console.log("Initialization finished. Ready to start");
+                    Quagga.start();
+                });
+                Quagga.onDetected(function(result) {
+                    barcodeInput.value = result.codeResult.code;
+                    scannerContainer.style.display = 'none';
+                    Quagga.stop();
+                    scanProduct(); // Call scanProduct after detection
+                });
+            } else {
+                scannerContainer.style.display = 'none';
+                Quagga.stop();
+            }
+        }
+    });
     checkoutBtn.addEventListener('click', processCheckout);
     newSaleBtn.addEventListener('click', resetSale);
     printReceiptBtn.addEventListener('click', printReceipt);
 
+    productSearch.addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase();
+        if (searchTerm.length < 2) {
+            productList.innerHTML = '';
+            return;
+        }
+
+        fetch(`/api/products?search=${searchTerm}`)
+            .then(response => response.json())
+            .then(products => {
+                productList.innerHTML = '';
+                if (products.length > 0) {
+                    products.forEach(product => {
+                        const item = document.createElement('a');
+                        item.href = '#';
+                        item.className = 'list-group-item list-group-item-action';
+                        item.textContent = `${product.name} (${product.barcode}) - KSh ${product.selling_price.toFixed(2)}`;
+                        item.addEventListener('click', function() {
+                            addToCart(product);
+                            productList.innerHTML = '';
+                            productSearch.value = '';
+                        });
+                        productList.appendChild(item);
+                    });
+                } else {
+                    productList.innerHTML = '<a href="#" class="list-group-item list-group-item-action disabled">No products found.</a>';
+                }
+            });
+    });
     
     // Functions
     function scanProduct() {
@@ -115,7 +180,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     
     function updateCartDisplay() {
-        localStorage.setItem('cart', JSON.stringify(cart));
         cartItems.innerHTML = '';
         let subtotal = 0;
         
@@ -252,13 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         cart.length = 0;
-        localStorage.removeItem('cart');
         customerId = null;
         document.getElementById('customer-search').value = '';
         document.getElementById('cash').checked = true;
         updateCartDisplay();
         barcodeInput.focus();
     }
-
-    updateCartDisplay();
 });
