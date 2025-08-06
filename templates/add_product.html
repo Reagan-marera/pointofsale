@@ -13,127 +13,379 @@
 </div>
 
 <div class="row">
-    <div class="col-md-6">
-        <form method="POST" action="{{ url_for('add_product') }}">
-            <div class="mb-3">
-                <label for="name" class="form-label">Product Name</label>
-                <input type="text" class="form-control" id="name" name="name" required>
-            </div>
+    <div class="col-md-8">
+        <form method="POST" action="{{ url_for('add_product') }}" id="product-form">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Product Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">Product Name *</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
 
-            <div class="mb-3">
-                <label for="category" class="form-label">Category</label>
-                <select class="form-select" id="category" name="category" required>
-                    <option value="Electronics" selected>Electronics</option>
-                    <!-- Add more categories as needed -->
-                </select>
-            </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="category" class="form-label">Category *</label>
+                            <select class="form-select" id="category" name="category" required>
+                                <option value="" disabled selected>Select category</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Clothing">Clothing</option>
+                                <option value="Groceries">Groceries</option>
+                                <option value="Home Appliances">Home Appliances</option>
+                                <option value="Office Supplies">Office Supplies</option>
+                            </select>
+                        </div>
+                    </div>
 
-            <div class="mb-3">
-                <label for="supplier_id" class="form-label">Supplier</label>
-                <select class="form-select" id="supplier_id" name="supplier_id" required>
-                    <option value="" selected disabled>Select a supplier</option>
-                    {% for supplier in suppliers %}
-                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="supplier_id" class="form-label">Supplier *</label>
+                            <select class="form-select" id="supplier_id" name="supplier_id" required>
+                                <option value="" disabled selected>Select supplier</option>
+                                {% for supplier in suppliers %}
+                                <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
 
-            <div class="mb-3">
-                <label for="dealer_id" class="form-label">Dealer</label>
-                <select class="form-select" id="dealer_id" name="dealer_id" required>
-                    <option value="" selected disabled>Select a dealer</option>
-                    {% for dealer in dealers %}
-                    <option value="{{ dealer.id }}">{{ dealer.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="dealer_id" class="form-label">Dealer *</label>
+                            <select class="form-select" id="dealer_id" name="dealer_id" required>
+                                <option value="" disabled selected>Select dealer</option>
+                                {% for dealer in dealers %}
+                                <option value="{{ dealer.id }}">{{ dealer.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
 
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="buying_price" class="form-label">Buying Price</label>
-                    <div class="input-group">
-                        <span class="input-group-text">KSh</span>
-                        <input type="number" step="0.01" class="form-control" id="buying_price" name="buying_price" required>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="barcode" class="form-label">Barcode *</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="barcode" name="barcode" required>
+                                <button class="btn btn-outline-primary" type="button" id="scan-barcode-btn" data-bs-toggle="modal" data-bs-target="#barcodeScannerModal">
+                                    <i class="bi bi-upc-scan"></i> Scan
+                                </button>
+                                <button class="btn btn-outline-secondary" type="button" id="generate-barcode-btn">
+                                    <i class="bi bi-upc"></i> Generate
+                                </button>
+                            </div>
+                            <small class="text-muted">Scan or enter product barcode</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check form-switch pt-4">
+                                <input class="form-check-input" type="checkbox" id="vatable" name="vatable" checked>
+                                <label class="form-check-label" for="vatable">VAT applicable</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <label for="selling_price" class="form-label">Selling Price</label>
-                    <div class="input-group">
-                        <span class="input-group-text">KSh</span>
-                        <input type="number" step="0.01" class="form-control" id="selling_price" name="selling_price" required>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Pricing & Inventory</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="buying_price" class="form-label">Buying Price (KSh) *</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="buying_price" name="buying_price" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="selling_price" class="form-label">Selling Price (KSh) *</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="selling_price" name="selling_price" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="stock" class="form-label">Initial Stock *</label>
+                            <input type="number" class="form-control" id="stock" name="stock" value="0" min="0" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="min_stock" class="form-label">Minimum Stock Level *</label>
+                            <input type="number" class="form-control" id="min_stock" name="min_stock" value="5" min="0" required>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="stock" class="form-label">Initial Stock</label>
-                    <input type="number" class="form-control" id="stock" name="stock" value="0" min="0" required>
-                </div>
-                <div class="col-md-6">
-                    <label for="min_stock" class="form-label">Min Stock Level</label>
-                    <input type="number" class="form-control" id="min_stock" name="min_stock" value="5" min="0" required>
-                </div>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="reset" class="btn btn-secondary me-md-2">Reset</button>
+                <button type="submit" class="btn btn-primary">Save Product</button>
             </div>
-
-            <div class="mb-3">
-                <label for="barcode" class="form-label">Barcode</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="barcode" name="barcode" required>
-                    <button class="btn btn-outline-secondary" type="button" id="scan-barcode-btn">
-                        <i class="fas fa-barcode"></i> Scan
-                    </button>
-                </div>
-            </div>
-            <div id="scanner-container" style="height: 300px; display: none;"></div>
-
-            <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" id="vatable" name="vatable" checked>
-                <label class="form-check-label" for="vatable">
-                    Vatable
-                </label>
-            </div>
-
-            <button type="submit" class="btn btn-primary">Save Product</button>
         </form>
+    </div>
+</div>
+
+<!-- Barcode Scanner Modal -->
+<div class="modal fade" id="barcodeScannerModal" tabindex="-1" aria-labelledby="barcodeScannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="barcodeScannerModalLabel">Barcode Scanner</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Point the camera at the barcode to scan
+                </div>
+                
+                <div id="scanner-container" class="text-center">
+                    <div id="interactive" class="viewport mb-3"></div>
+                    <div class="scanner-overlay">
+                        <div class="scanner-line"></div>
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="manual-barcode-input" placeholder="Or enter barcode manually">
+                        <button class="btn btn-primary" type="button" id="manual-scan-confirm-btn">
+                            <i class="bi bi-check-circle"></i> Confirm
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/quagga/quagga.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
 <script>
-    document.getElementById('scan-barcode-btn').addEventListener('click', function () {
-        let scannerContainer = document.getElementById('scanner-container');
-        if (scannerContainer.style.display === 'none') {
-            scannerContainer.style.display = 'block';
-            Quagga.init({
-                inputStream : {
-                    name : "Live",
-                    type : "LiveStream",
-                    target: scannerContainer
-                },
-                decoder : {
-                    readers : ["code_128_reader"]
-                }
-            }, function(err) {
-                if (err) {
-                    console.log(err);
-                    return
-                }
-                console.log("Initialization finished. Ready to start");
-                Quagga.start();
-            });
-            Quagga.onDetected(function(result) {
-                console.log("Barcode detected and processed : [" + result.codeResult.code + "]", result);
-                document.getElementById('barcode').value = result.codeResult.code;
-                scannerContainer.style.display = 'none';
-                Quagga.stop();
-            });
+document.addEventListener('DOMContentLoaded', function() {
+    const barcodeScannerModal = new bootstrap.Modal(document.getElementById('barcodeScannerModal'));
+    let scannerActive = false;
+    let scannerInitialized = false;
+    let lastScannedCode = null;
+    let scanTimeout = null;
+
+    // Initialize scanner when modal is shown
+    document.getElementById('barcodeScannerModal').addEventListener('shown.bs.modal', function() {
+        if (!scannerInitialized) {
+            initBarcodeScanner();
+            scannerInitialized = true;
         } else {
-            scannerContainer.style.display = 'none';
-            Quagga.stop();
+            startScanner();
+        }
+        document.getElementById('manual-barcode-input').value = '';
+        lastScannedCode = null;
+    });
+
+    // Clean up scanner when modal is hidden
+    document.getElementById('barcodeScannerModal').addEventListener('hidden.bs.modal', function() {
+        stopScanner();
+        clearTimeout(scanTimeout);
+    });
+
+    // Scan button click handler
+    document.getElementById('scan-barcode-btn').addEventListener('click', function() {
+        barcodeScannerModal.show();
+    });
+
+    // Manual barcode confirmation
+    document.getElementById('manual-scan-confirm-btn').addEventListener('click', function() {
+        const barcode = document.getElementById('manual-barcode-input').value.trim();
+        if (barcode) {
+            processScannedBarcode(barcode);
+            barcodeScannerModal.hide();
+        } else {
+            alert('Please enter a barcode');
         }
     });
+
+    // Generate barcode button
+    document.getElementById('generate-barcode-btn').addEventListener('click', function() {
+        const randomBarcode = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+        document.getElementById('barcode').value = randomBarcode;
+    });
+
+    function initBarcodeScanner() {
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'),
+                constraints: {
+                    width: 640,
+                    height: 480,
+                    facingMode: "environment"
+                },
+            },
+            decoder: {
+                readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader"],
+                multiple: false
+            },
+            locate: true,
+            debug: {
+                drawBoundingBox: true,
+                showFrequency: true,
+                drawScanline: true,
+                showPattern: true
+            }
+        }, function(err) {
+            if (err) {
+                console.error("Scanner initialization error:", err);
+                alert("Failed to initialize barcode scanner. Please use manual entry.");
+                return;
+            }
+            console.log("Scanner initialized successfully");
+            startScanner();
+        });
+
+        Quagga.onProcessed(function(result) {
+            const drawingCtx = Quagga.canvas.ctx.overlay;
+            const drawingCanvas = Quagga.canvas.dom.overlay;
+
+            if (result) {
+                if (result.boxes) {
+                    drawingCtx.clearRect(0, 0, 
+                        parseInt(drawingCanvas.getAttribute("width")), 
+                        parseInt(drawingCanvas.getAttribute("height")));
+                    result.boxes.filter(function(box) {
+                        return box !== result.box;
+                    }).forEach(function(box) {
+                        Quagga.ImageDebug.drawPath(box, {x: 0, y: 1}, drawingCtx, {color: "green", lineWidth: 2});
+                    });
+                }
+
+                if (result.box) {
+                    Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, drawingCtx, {color: "#00F", lineWidth: 2});
+                }
+
+                if (result.codeResult && result.codeResult.code) {
+                    Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, drawingCtx, {color: 'red', lineWidth: 3});
+                }
+            }
+        });
+
+        Quagga.onDetected(function(result) {
+            const code = result.codeResult.code;
+            console.log("Barcode detected:", code);
+            
+            // Prevent duplicate scans of the same code
+            if (code === lastScannedCode) {
+                return;
+            }
+            
+            lastScannedCode = code;
+            processScannedBarcode(code);
+            
+            // Add slight delay before closing to give user feedback
+            scanTimeout = setTimeout(() => {
+                stopScanner();
+                barcodeScannerModal.hide();
+            }, 500);
+        });
+    }
+
+    function processScannedBarcode(barcode) {
+        document.getElementById('barcode').value = barcode;
+        document.getElementById('manual-barcode-input').value = barcode;
+        
+        // Optional: Auto-focus on next field for better UX
+        document.getElementById('name').focus();
+    }
+
+    function startScanner() {
+        if (!scannerActive && scannerInitialized) {
+            Quagga.start();
+            scannerActive = true;
+            console.log("Scanner started");
+        }
+    }
+
+    function stopScanner() {
+        if (scannerActive) {
+            Quagga.stop();
+            scannerActive = false;
+            console.log("Scanner stopped");
+        }
+    }
+
+    // Form validation
+    document.getElementById('product-form').addEventListener('submit', function(e) {
+        // Validate selling price is higher than buying price
+        const buyingPrice = parseFloat(document.getElementById('buying_price').value);
+        const sellingPrice = parseFloat(document.getElementById('selling_price').value);
+        
+        if (sellingPrice <= buyingPrice) {
+            e.preventDefault();
+            alert('Selling price must be higher than buying price');
+            document.getElementById('selling_price').focus();
+        }
+        
+        // Validate barcode is unique (you would typically do this server-side)
+        // This is just a client-side example
+        const barcode = document.getElementById('barcode').value.trim();
+        if (barcode.length < 8) {
+            e.preventDefault();
+            alert('Barcode must be at least 8 characters long');
+            document.getElementById('barcode').focus();
+        }
+    });
+});
 </script>
+
+<style>
+.viewport {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    overflow: hidden;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+}
+
+.viewport canvas, .viewport video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#scanner-container {
+    position: relative;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.scanner-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background-color: rgba(255, 0, 0, 0.5);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+    animation: scan 2s infinite linear;
+}
+
+@keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+}
+
+/* Debug canvas styling */
+canvas.drawing, canvas.drawingBuffer {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+</style>
 {% endblock %}
