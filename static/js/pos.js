@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        fetch(`/api/products/${encodeURIComponent(barcode)}`)
+        fetch(`/api/products/${barcode}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Product not found');
