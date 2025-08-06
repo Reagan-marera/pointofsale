@@ -447,11 +447,7 @@ def sales_report():
     product_search = request.args.get('product_search')
     
     # Build query
-    query = Sale.query.options(
-        joinedload(Sale.items).joinedload(SaleItem.product),
-        joinedload(Sale.user),
-        joinedload(Sale.customer)
-    )
+    query = Sale.query
     
     if product_search:
         query = query.join(SaleItem).join(Product).filter(
@@ -460,15 +456,15 @@ def sales_report():
         )
 
     if start_date:
-        start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
-        query = query.filter(Sale.sale_date >= start_date_obj)
+        start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        query = query.filter(Sale.sale_date >= start_date)
     
     if end_date:
-        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-        query = query.filter(Sale.sale_date < end_date_obj)
+        end_date = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+        query = query.filter(Sale.sale_date < end_date)
     
     if payment_method:
-        query = query.filter(Sale.payment_method == payment_method)
+        query = query.filter_by(payment_method=payment_method)
     
     # Get sales data
     sales = query.order_by(Sale.sale_date.desc()).limit(50).all()
@@ -479,27 +475,18 @@ def sales_report():
     average_sale = total_sales / total_transactions if total_transactions > 0 else 0
     
     # Sales by payment method
-    sales_by_method_query = db.session.query(
+    sales_by_method = db.session.query(
         Sale.payment_method,
         func.count(Sale.id).label('count'),
         func.sum(Sale.total_amount).label('total')
-    )
-
-    if start_date:
-        sales_by_method_query = sales_by_method_query.filter(Sale.sale_date >= datetime.strptime(start_date, '%Y-%m-%d'))
-    if end_date:
-        sales_by_method_query = sales_by_method_query.filter(Sale.sale_date < (datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)))
-    if payment_method:
-        sales_by_method_query = sales_by_method_query.filter(Sale.payment_method == payment_method)
-
-    sales_by_method = sales_by_method_query.group_by(Sale.payment_method).all()
+    ).group_by(Sale.payment_method).all()
     
     # Prepare data for chart
-    payment_method_labels = [method[0].capitalize() for method in sales_by_method] if sales_by_method else []
-    payment_method_data = [float(method[2]) for method in sales_by_method] if sales_by_method else []
+    payment_method_labels = [method[0].capitalize() for method in sales_by_method]
+    payment_method_data = [float(method[2]) for method in sales_by_method]
     
     return render_template('sales_report.html',
-                        sales=sales,
+                        products=products,
                         total_sales=total_sales,
                         total_transactions=total_transactions,
                         average_sale=average_sale,
@@ -522,10 +509,9 @@ def get_product_by_id(product_id):
 
 @app.route('/api/products/<barcode>')
 def get_product_by_barcode(barcode):
-    app.logger.info(f"Searching for product with barcode: {barcode}")
     product = Product.query.filter_by(barcode=barcode).first()
     if product:
-        product_data = {
+        return jsonify({
             'id': product.id,
             'barcode': product.barcode,
             'name': product.name,
@@ -533,31 +519,8 @@ def get_product_by_barcode(barcode):
             'stock': product.current_stock,
             'tax_rate': product.tax_rate,
             'vatable': product.vatable
-        }
-        app.logger.info(f"Found product: {product_data}")
-        return jsonify(product_data)
-    app.logger.warning(f"Product with barcode {barcode} not found")
+        })
     return jsonify({'error': 'Product not found'}), 404
-
-@app.route('/api/products')
-def get_products():
-    search = request.args.get('search')
-    app.logger.info(f"Searching for products with term: {search}")
-    query = Product.query
-
-    if search:
-        query = query.filter(
-            or_(
-                Product.name.ilike(f'%{search}%'),
-                Product.barcode == search
-            )
-        )
-
-    products = query.all()
-    products_data = [{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price, 'stock': p.current_stock, 'vatable': p.vatable} for p in products]
-    app.logger.info(f"Found {len(products_data)} products")
-    return jsonify(products_data)
-
 # Add user management routes
 @app.route('/admin/users/add', methods=['POST'])
 @login_required(roles=['admin'])
@@ -698,7 +661,7 @@ def get_products():
 
     products = query.all()
 
-    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price, 'stock': p.current_stock, 'vatable': p.vatable} for p in products])
+    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'selling_price': p.selling_price} for p in products])
 
 @app.route('/api/checkout', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
@@ -1571,5 +1534,111 @@ def reset_password(email):
             else:
                 flash('User not found.', 'danger')
     return render_template('reset_password.html', email=email)
+# Simplified POS routes
+@app.route('/pos_simple')
+@login_required(roles=['cashier', 'manager', 'admin'])
+def pos_simple():
+    return render_template('pos_simple.html')
+
+@app.route('/api/add_to_cart', methods=['POST'])
+@login_required(roles=['cashier', 'manager', 'admin'])
+def add_to_cart_simple():
+    data = request.get_json()
+    barcode = data.get('barcode')
+
+    product = Product.query.filter_by(barcode=barcode).first()
+
+    if not product:
+        return jsonify({'success': False, 'error': 'Product not found'})
+
+    if product.current_stock < 1:
+        return jsonify({'success': False, 'error': 'Product out of stock'})
+
+    cart = session.get('cart', [])
+
+    existing_item = next((item for item in cart if item['id'] == product.id), None)
+
+    if existing_item:
+        if existing_item['quantity'] >= product.current_stock:
+            return jsonify({'success': False, 'error': 'Not enough stock'})
+        existing_item['quantity'] += 1
+    else:
+        cart.append({
+            'id': product.id,
+            'name': product.name,
+            'price': product.selling_price,
+            'quantity': 1
+        })
+
+    session['cart'] = cart
+
+    return jsonify({'success': True, 'cart': cart})
+
+@app.route('/api/checkout_simple', methods=['POST'])
+@login_required(roles=['cashier', 'manager', 'admin'])
+def checkout_simple():
+    cart = session.get('cart', [])
+
+    if not cart:
+        return jsonify({'success': False, 'error': 'Cart is empty'})
+
+    subtotal = 0
+    tax = 0
+
+    for item in cart:
+        product = Product.query.get(item['id'])
+        if not product:
+            return jsonify({'success': False, 'error': f'Product with id {item["id"]} not found'})
+
+        if product.current_stock < item['quantity']:
+            return jsonify({'success': False, 'error': f'Not enough stock for {product.name}'})
+
+        item_total = item['price'] * item['quantity']
+        subtotal += item_total
+        if product.vatable:
+            tax += item_total * product.tax_rate
+
+    total = subtotal + tax
+
+    sale = Sale(
+        receipt_number=Sale.generate_receipt_number(),
+        user_id=session['user_id'],
+        subtotal=subtotal,
+        tax_amount=tax,
+        total_amount=total,
+        payment_method='cash', # Simplified for now
+        channel='offline',
+        location_id=session.get('location_id')
+    )
+    db.session.add(sale)
+    db.session.commit()
+
+    for item in cart:
+        product = Product.query.get(item['id'])
+        sale_item = SaleItem(
+            sale_id=sale.id,
+            product_id=product.id,
+            quantity=item['quantity'],
+            unit_price=item['price'],
+            total_price=item['price'] * item['quantity']
+        )
+        db.session.add(sale_item)
+
+        product.current_stock -= item['quantity']
+
+        movement = InventoryMovement(
+            product_id=product.id,
+            movement_type='sale',
+            quantity=-item['quantity'],
+            reference_id=sale.id
+        )
+        db.session.add(movement)
+
+    db.session.commit()
+
+    session.pop('cart', None)
+
+    return jsonify({'success': True})
+
 if __name__ == '__main__':
     app.run(debug=True)
