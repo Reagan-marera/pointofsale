@@ -522,9 +522,10 @@ def get_product_by_id(product_id):
 
 @app.route('/api/products/<barcode>')
 def get_product_by_barcode(barcode):
+    app.logger.info(f"Searching for product with barcode: {barcode}")
     product = Product.query.filter_by(barcode=barcode).first()
     if product:
-        return jsonify({
+        product_data = {
             'id': product.id,
             'barcode': product.barcode,
             'name': product.name,
@@ -532,8 +533,31 @@ def get_product_by_barcode(barcode):
             'stock': product.current_stock,
             'tax_rate': product.tax_rate,
             'vatable': product.vatable
-        })
+        }
+        app.logger.info(f"Found product: {product_data}")
+        return jsonify(product_data)
+    app.logger.warning(f"Product with barcode {barcode} not found")
     return jsonify({'error': 'Product not found'}), 404
+
+@app.route('/api/products')
+def get_products():
+    search = request.args.get('search')
+    app.logger.info(f"Searching for products with term: {search}")
+    query = Product.query
+
+    if search:
+        query = query.filter(
+            or_(
+                Product.name.ilike(f'%{search}%'),
+                Product.barcode == search
+            )
+        )
+
+    products = query.all()
+    products_data = [{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price, 'stock': p.current_stock, 'vatable': p.vatable} for p in products]
+    app.logger.info(f"Found {len(products_data)} products")
+    return jsonify(products_data)
+
 # Add user management routes
 @app.route('/admin/users/add', methods=['POST'])
 @login_required(roles=['admin'])
@@ -674,7 +698,7 @@ def get_products():
 
     products = query.all()
 
-    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'selling_price': p.selling_price} for p in products])
+    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price, 'stock': p.current_stock, 'vatable': p.vatable} for p in products])
 
 @app.route('/api/checkout', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
