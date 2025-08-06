@@ -447,7 +447,11 @@ def sales_report():
     product_search = request.args.get('product_search')
     
     # Build query
-    query = Sale.query
+    query = Sale.query.options(
+        joinedload(Sale.items).joinedload(SaleItem.product),
+        joinedload(Sale.user),
+        joinedload(Sale.customer)
+    )
     
     if product_search:
         query = query.join(SaleItem).join(Product).filter(
@@ -456,15 +460,15 @@ def sales_report():
         )
 
     if start_date:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d')
-        query = query.filter(Sale.sale_date >= start_date)
+        start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+        query = query.filter(Sale.sale_date >= start_date_obj)
     
     if end_date:
-        end_date = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-        query = query.filter(Sale.sale_date < end_date)
+        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+        query = query.filter(Sale.sale_date < end_date_obj)
     
     if payment_method:
-        query = query.filter_by(payment_method=payment_method)
+        query = query.filter(Sale.payment_method == payment_method)
     
     # Get sales data
     sales = query.order_by(Sale.sale_date.desc()).limit(50).all()
@@ -475,18 +479,27 @@ def sales_report():
     average_sale = total_sales / total_transactions if total_transactions > 0 else 0
     
     # Sales by payment method
-    sales_by_method = db.session.query(
+    sales_by_method_query = db.session.query(
         Sale.payment_method,
         func.count(Sale.id).label('count'),
         func.sum(Sale.total_amount).label('total')
-    ).group_by(Sale.payment_method).all()
+    )
+
+    if start_date:
+        sales_by_method_query = sales_by_method_query.filter(Sale.sale_date >= datetime.strptime(start_date, '%Y-%m-%d'))
+    if end_date:
+        sales_by_method_query = sales_by_method_query.filter(Sale.sale_date < (datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)))
+    if payment_method:
+        sales_by_method_query = sales_by_method_query.filter(Sale.payment_method == payment_method)
+
+    sales_by_method = sales_by_method_query.group_by(Sale.payment_method).all()
     
     # Prepare data for chart
-    payment_method_labels = [method[0].capitalize() for method in sales_by_method]
-    payment_method_data = [float(method[2]) for method in sales_by_method]
+    payment_method_labels = [method[0].capitalize() for method in sales_by_method] if sales_by_method else []
+    payment_method_data = [float(method[2]) for method in sales_by_method] if sales_by_method else []
     
     return render_template('sales_report.html',
-                        products=products,
+                        sales=sales,
                         total_sales=total_sales,
                         total_transactions=total_transactions,
                         average_sale=average_sale,
@@ -642,9 +655,7 @@ def add_product():
 @app.route('/pos')
 @login_required(roles=['cashier', 'manager', 'admin'])
 def pos():
-    products = Product.query.filter(Product.current_stock > 0).all()
-    customers = Customer.query.all()
-    return render_template('pos.html', products=products, customers=customers)
+    return render_template('pos.html')
 
 @app.route('/api/products')
 def get_products():
