@@ -273,7 +273,7 @@ def products():
         query = query.filter(
             or_(
                 Product.name.ilike(f'%{product_search}%'),
-                Product.barcode.ilike(f'%{product_search}%')
+                Product.barcode == product_search
             )
         )
 
@@ -649,7 +649,7 @@ def pos():
 @app.route('/api/products')
 def get_products():
     search = request.args.get('search')
-    query = Product.query.join(PurchaseOrderItem).distinct()
+    query = Product.query
 
     if search:
         query = query.filter(
