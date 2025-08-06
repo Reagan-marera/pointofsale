@@ -1,0 +1,143 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Simple POS Terminal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Simple POS Terminal</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Add Product to Cart</h5>
+            </div>
+            <div class="card-body">
+                <form id="add-to-cart-form">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="barcode-input" placeholder="Enter barcode..." autofocus>
+                        <button class="btn btn-primary" type="submit">Add to Cart</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Cart</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cart-items">
+                            <!-- Cart items will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <h5>Total:</h5>
+                    <h5 id="total">KSh 0.00</h5>
+                </div>
+                <button class="btn btn-success w-100 mt-3" id="checkout-btn">Checkout</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addToCartForm = document.getElementById('add-to-cart-form');
+    const barcodeInput = document.getElementById('barcode-input');
+    const cartItems = document.getElementById('cart-items');
+    const totalEl = document.getElementById('total');
+    const checkoutBtn = document.getElementById('checkout-btn');
+
+    let cart = [];
+
+    addToCartForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const barcode = barcodeInput.value.trim();
+        if (barcode) {
+            addToCart(barcode);
+        }
+    });
+
+    checkoutBtn.addEventListener('click', function() {
+        fetch('/api/checkout_simple', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({cart: cart})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Checkout successful!');
+                cart = [];
+                updateCartDisplay();
+            } else {
+                alert('Checkout failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Checkout failed');
+        });
+    });
+
+    function addToCart(barcode) {
+        fetch('/api/add_to_cart', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({barcode: barcode})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                cart = data.cart;
+                updateCartDisplay();
+                barcodeInput.value = '';
+                barcodeInput.focus();
+            } else {
+                alert(data.error);
+            }
+        });
+    }
+
+    function updateCartDisplay() {
+        cartItems.innerHTML = '';
+        let total = 0;
+        cart.forEach(item => {
+            const row = document.createElement('tr');
+            const itemTotal = item.price * item.quantity;
+            total += itemTotal;
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>${item.quantity}</td>
+                <td>KSh ${item.price.toFixed(2)}</td>
+                <td>KSh ${itemTotal.toFixed(2)}</td>
+            `;
+            cartItems.appendChild(row);
+        });
+        totalEl.textContent = `KSh ${total.toFixed(2)}`;
+    }
+});
+</script>
+{% endblock %}
