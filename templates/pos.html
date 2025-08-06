@@ -29,10 +29,11 @@
                         <i class="fas fa-barcode"></i> Scan
                     </button>
                 </div>
-                <form action="{{ url_for('products') }}" method="get" class="input-group mb-3">
-                    <input type="text" class="form-control" name="product_search" placeholder="Search for a product...">
-                    <button class="btn btn-info" type="submit">Search</button>
-                </form>
+                <div class="mb-3">
+                    <label for="product-search" class="form-label">Or search for a product</label>
+                    <input type="text" class="form-control" id="product-search" placeholder="Search by name...">
+                    <div id="product-list" class="list-group mt-2"></div>
+                </div>
                 
                 <div class="table-responsive">
                     <table class="table table-sm" id="cart-table">
