@@ -655,7 +655,7 @@ def get_products():
         query = query.filter(
             or_(
                 Product.name.ilike(f'%{search}%'),
-                Product.barcode.ilike(f'%{search}%')
+                Product.barcode == search
             )
         )
 
