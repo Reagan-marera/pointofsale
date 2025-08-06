@@ -673,7 +673,7 @@ def checkout():
     split_payment = data.get('split_payment', False)
 
     if not items:
-        return jsonify({'error': 'No items in cart'}), 400
+        return jsonify({'error': 'No items in cart.'}), 400
 
     # Calculate totals
     subtotal = 0
