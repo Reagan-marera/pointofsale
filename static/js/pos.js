@@ -43,9 +43,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         fetch(`/api/products?search=${searchTerm}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(products => {
                 productList.innerHTML = '';
+                if (products.length === 0) {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item';
+                    item.textContent = 'No products found';
+                    productList.appendChild(item);
+                    return;
+                }
                 products.forEach(product => {
                     const item = document.createElement('a');
                     item.href = '#';
@@ -59,6 +71,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     productList.appendChild(item);
                 });
+            })
+            .catch(error => {
+                console.error('Error fetching products:', error);
+                productList.innerHTML = '<div class="list-group-item text-danger">Error searching for products.</div>';
             });
     });
 
@@ -86,65 +102,38 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             decoder: {
                 readers: [
-                    "code_128_reader",
                     "ean_reader",
-                    "ean_8_reader",
-                    "code_39_reader",
-                    "code_39_vin_reader",
-                    "codabar_reader",
                     "upc_reader",
-                    "upc_e_reader",
-                    "i2of5_reader"
+                    "code_128_reader"
                 ],
                 debug: {
-                    showCanvas: true,
-                    showPatches: true,
-                    showFoundPatches: true,
-                    showSkeleton: true,
-                    showLabels: true,
-                    showFoundLabels: true,
-                    showImage: true,
-                    drawBoundingBox: true,
-                    drawScanline: true,
-                    showPattern: true
+                    showCanvas: false,
+                    showPatches: false,
+                    showFoundPatches: false,
+                    showSkeleton: false,
+                    showLabels: false,
+                    showFoundLabels: false,
+                    showImage: false,
+                    drawBoundingBox: false,
+                    drawScanline: false,
+                    showPattern: false
                 }
             },
         }, function (err) {
             if (err) {
-                console.log(err);
+                console.error(err);
+                alert('Error initializing scanner: ' + err);
                 return;
             }
             console.log("Initialization finished. Ready to start");
             Quagga.start();
         });
 
-        Quagga.onProcessed(function (result) {
-            var drawingCtx = Quagga.canvas.ctx.overlay,
-                drawingCanvas = Quagga.canvas.dom.overlay;
-
-            if (result) {
-                if (result.boxes) {
-                    drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute("width")), parseInt(drawingCanvas.getAttribute("height")));
-                    result.boxes.filter(function (box) {
-                        return box !== result.box;
-                    }).forEach(function (box) {
-                        Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, { color: "green", lineWidth: 2 });
-                    });
-                }
-
-                if (result.box) {
-                    Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: "#00F", lineWidth: 2 });
-                }
-
-                if (result.codeResult && result.codeResult.code) {
-                    Quagga.ImageDebug.drawPath(result.line, { x: 'x', y: 'y' }, drawingCtx, { color: 'red', lineWidth: 3 });
-                }
-            }
-        });
-
         Quagga.onDetected(function (result) {
             scanProduct(result.codeResult.code);
             Quagga.stop();
+            // Hide the scanner after a successful scan
+            document.querySelector('#barcode-scanner').style.display = 'none';
         });
     }
 
@@ -156,8 +145,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         fetch(`/api/products/${barcode}`)
             .then(response => {
+                if (response.status === 404) {
+                    throw new Error('Product with this barcode not found.');
+                }
                 if (!response.ok) {
-                    throw new Error('Product not found');
+                    throw new Error('An error occurred while fetching the product.');
                 }
                 return response.json();
             })
@@ -167,9 +159,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                // Check stock
                 if (product.stock < 1) {
-                    alert('Product out of stock');
+                    alert('Product is out of stock.');
                     return;
                 }
                 
@@ -178,8 +169,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 barcodeInput.focus();
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Product not found. Please try another barcode.');
+                console.error('Error scanning product:', error);
+                alert(error.message);
             });
     }
     
@@ -221,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
     
-        // ✅ Check against item.stock before increasing
         if (newQuantity > item.stock) {
             alert(`Only ${item.stock} item(s) available in stock`);
             return;
@@ -301,22 +291,6 @@ document.addEventListener('DOMContentLoaded', function() {
         checkoutBtn.disabled = cart.length === 0;
     }
     
-    function updateQuantity(productId, change) {
-        const item = cart.find(item => item.id === productId);
-        if (!item) return;
-        
-        const newQuantity = item.quantity + change;
-        
-        if (newQuantity < 1) {
-            removeItem(productId);
-            return;
-        }
-        
-        // Check stock (would need to fetch current stock from server in real app)
-        item.quantity = newQuantity;
-        updateCartDisplay();
-    }
-    
     function removeItem(productId) {
         const index = cart.findIndex(item => item.id === productId);
         if (index !== -1) {
@@ -370,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         cart.length = 0;
         customerId = null;
-        document.getElementById('customer-search').value = '';
+        document.getElementById('customer-select').value = '';
         document.getElementById('cash').checked = true;
         updateCartDisplay();
         barcodeInput.focus();
