@@ -51,9 +51,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     item.href = '#';
                     item.className = 'list-group-item list-group-item-action';
                     item.textContent = `${product.name} (${product.barcode})`;
-                    item.addEventListener('click', function() {
-                        barcodeInput.value = product.barcode;
-                        scanProduct(product.barcode);
+                    item.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        addToCart(product);
                         productList.innerHTML = '';
                         productSearch.value = '';
                     });
