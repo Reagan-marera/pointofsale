@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     productSearch.addEventListener('keyup', function() {
         const searchTerm = this.value.toLowerCase();
+        console.log('Searching for:', searchTerm);
         if (searchTerm.length < 2) {
             productList.innerHTML = '';
             return;
@@ -44,12 +45,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         fetch(`/api/products?search=${searchTerm}`)
             .then(response => {
+                console.log('Received response from /api/products:', response);
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
                 return response.json();
             })
             .then(products => {
+                console.log('Received products:', products);
                 productList.innerHTML = '';
                 if (products.length === 0) {
                     const item = document.createElement('div');
@@ -138,6 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function scanProduct(barcode) {
+        console.log('Scanning for barcode:', barcode);
         if (!barcode) {
             alert('Please enter a barcode');
             return;
@@ -145,6 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         fetch(`/api/products/${barcode}`)
             .then(response => {
+                console.log('Received response from /api/products/<barcode>:', response);
                 if (response.status === 404) {
                     throw new Error('Product with this barcode not found.');
                 }
@@ -154,6 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(product => {
+                console.log('Received product data:', product);
                 if (product.error) {
                     alert(product.error);
                     return;
@@ -175,6 +181,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function addToCart(product) {
+        if (typeof product.price === 'undefined') {
+            console.error('Product is missing price:', product);
+            alert('Error: Product information is incomplete.');
+            return;
+        }
+
         const existingItem = cart.find(item => item.id === product.id);
     
         if (existingItem) {
@@ -193,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 name: product.name,
                 price: product.price,
                 quantity: 1,
-                stock: product.stock, // 👈 Store the stock with the cart item
+                stock: product.stock,
                 vatable: product.vatable
             });
         }
