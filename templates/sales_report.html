@@ -98,7 +98,7 @@
                 </thead>
                 <tbody>
                     {% for sale in sales %}
-                    <tr data-bs-toggle="collapse" data-bs-target="#sale-{{ sale.id }}" class="accordion-toggle">
+                    <tr>
                         <td><i class="bi bi-chevron-down"></i></td>
                         <td>{{ sale.receipt_number }}</td>
                         <td>{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</td>
@@ -235,8 +235,7 @@
 
         const deleteButtons = document.querySelectorAll('.delete-receipt-btn');
         deleteButtons.forEach(button => {
-            button.addEventListener('click', function(event) {
-                event.stopPropagation();
+            button.addEventListener('click', function() {
                 const receiptNumber = this.dataset.receiptNumber;
                 if (confirm(`Are you sure you want to delete receipt #${receiptNumber}?`)) {
                     const form = document.createElement('form');
@@ -245,13 +244,6 @@
                     document.body.appendChild(form);
                     form.submit();
                 }
-            });
-        });
-
-        const printButtons = document.querySelectorAll('.print-receipt-btn');
-        printButtons.forEach(button => {
-            button.addEventListener('click', function(event) {
-                event.stopPropagation();
             });
         });
     });
