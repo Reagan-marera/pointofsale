@@ -5,32 +5,44 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">POS Terminal</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button class="btn btn-sm btn-outline-secondary me-2" id="new-sale-btn">
+            <i class="fas fa-plus-circle"></i> New Sale
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="print-receipt-btn">
+            <i class="fas fa-print"></i> Print Receipt
+        </button>
+    </div>
 </div>
 
 <div class="row">
     <div class="col-md-8">
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Scan Products</h5>
+                <h5>Products</h5>
             </div>
             <div class="card-body">
-                <form id="add-to-cart-form">
-                    <div class="input-group mb-3">
-                        <input type="text" class="form-control" id="barcode-input" placeholder="Scan barcode..." autofocus>
-                        <button class="btn btn-primary" type="submit" id="scan-btn">
-                            <i class="fas fa-barcode"></i> Add to Cart
-                        </button>
-                    </div>
-                </form>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="barcode-input" placeholder="Enter barcode..." autofocus>
+                    <button class="btn btn-primary" type="button" id="scan-btn">
+                        <i class="fas fa-barcode"></i> Scan
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <label for="product-search" class="form-label">Or search for a product</label>
+                    <input type="text" class="form-control" id="product-search" placeholder="Search by name...">
+                    <div id="product-list" class="list-group mt-2"></div>
+                </div>
                 
                 <div class="table-responsive">
                     <table class="table table-sm" id="cart-table">
                         <thead>
                             <tr>
                                 <th>Product</th>
-                                <th>Qty</th>
                                 <th>Price</th>
+                                <th>Qty</th>
                                 <th>Total</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="cart-items">
@@ -48,9 +60,27 @@
                 <h5>Payment</h5>
             </div>
             <div class="card-body">
+                <div class="mb-3">
+                    <label for="customer-select" class="form-label">Customer (Optional)</label>
+                    <select class="form-select" id="customer-select">
+                        <option value="">Select a customer</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}">{{ customer.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
                 <div class="table-responsive mb-3">
                     <table class="table table-sm">
                         <tbody>
+                            <tr>
+                                <td>Subtotal:</td>
+                                <td class="text-end" id="subtotal">KSh 0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Tax (16%):</td>
+                                <td class="text-end" id="tax">KSh 0.00</td>
+                            </tr>
                             <tr>
                                 <td>Total:</td>
                                 <td class="text-end fw-bold" id="total">KSh 0.00</td>
@@ -59,6 +89,23 @@
                     </table>
                 </div>
                 
+                <div class="mb-3">
+                    <label class="form-label">Payment Method</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="payment-method" id="cash" value="cash" checked>
+                        <label class="btn btn-outline-primary" for="cash">Cash</label>
+
+                        <input type="radio" class="btn-check" name="payment-method" id="mpesa" value="mpesa">
+                        <label class="btn btn-outline-primary" for="mpesa">M-Pesa</label>
+                    </div>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="split-payment">
+                    <label class="form-check-label" for="split-payment">
+                        Split Payment
+                    </label>
+                </div>
                 <button class="btn btn-success w-100 py-3" id="checkout-btn">
                     <i class="fas fa-credit-card"></i> Complete Sale
                 </button>
@@ -66,8 +113,32 @@
         </div>
     </div>
 </div>
+
+<!-- Barcode Scanner Modal -->
+<div class="modal fade" id="barcodeScannerModal" tabindex="-1" aria-labelledby="barcodeScannerModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="barcodeScannerModalLabel">Scan Barcode</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="interactive" class="viewport"></div>
+        <div class="form-group mt-3">
+            <label for="manual-barcode-input">Manual Barcode Entry</label>
+            <input type="text" class="form-control" id="manual-barcode-input" placeholder="Enter barcode manually">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="manual-scan-confirm-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/pos.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
+<script src="{{ url_for('static', filename='js/pos_new.js') }}"></script>
 {% endblock %}
