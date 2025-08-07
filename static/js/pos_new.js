@@ -313,14 +313,61 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Print receipt button
-    document.getElementById('print-receipt-btn').addEventListener('click', function() {
+    let lastReceiptNumber = null;
+
+    // ... (rest of the code)
+
+    // Checkout button
+    document.getElementById('checkout-btn').addEventListener('click', function() {
         if (cart.length === 0) {
-            alert('Cart is empty! Nothing to print.');
+            alert('Cart is empty! Please add products before checkout.');
             return;
         }
 
-        // You would implement your receipt printing logic here
-        alert('Receipt printing functionality would be implemented here');
+        const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+        const customerId = document.getElementById('customer-select').value || null;
+        const splitPayment = document.getElementById('split-payment').checked;
+
+        const saleData = {
+            items: cart,
+            customer_id: customerId,
+            payment_method: paymentMethod,
+            split_payment: splitPayment
+        };
+
+        fetch('/api/sales', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(saleData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                lastReceiptNumber = data.receipt_number;
+                alert('Sale completed successfully!');
+                // Print receipt or clear cart as needed
+                cart = [];
+                document.getElementById('cart-items').innerHTML = '';
+                updateCartTotals();
+                document.getElementById('barcode-input').focus();
+            } else {
+                alert('Checkout failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error completing sale. Please try again.');
+        });
+    });
+
+    // Print receipt button
+    document.getElementById('print-receipt-btn').addEventListener('click', function() {
+        if (lastReceiptNumber) {
+            window.open(`/receipt/print/${lastReceiptNumber}`, '_blank');
+        } else {
+            alert('No receipt to print. Please complete a sale first.');
+        }
     });
 });
