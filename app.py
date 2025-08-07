@@ -767,8 +767,10 @@ def print_receipt(receipt_number):
     return render_template('receipt_print.html', sale=sale)
 
 @app.route('/receipt/<receipt_number>/delete', methods=['POST'])
-@login_required(roles=['admin', 'manager', 'cashier'])
+@login_required(roles=['admin'])
 def delete_receipt(receipt_number):
+    app.logger.info(f"Attempting to delete receipt: {receipt_number}")
+    app.logger.info(f"User session: {session}")
     sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
 
     # Optional: delete related sale_items if your model requires it
@@ -778,6 +780,7 @@ def delete_receipt(receipt_number):
     db.session.commit()
 
     flash(f'Receipt #{receipt_number} deleted successfully.', 'success')
+    app.logger.info(f"Successfully deleted receipt: {receipt_number}")
     return redirect(url_for('sales_report'))
 @app.route('/purchase_orders/<int:order_id>/receive', methods=['POST'])
 @login_required(roles=['manager'])
