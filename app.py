@@ -1385,43 +1385,30 @@ def add_financier_debit():
         return redirect(url_for('list_financier_debits'))
 
     return render_template('financiers/add_debit.html', financiers=financiers)
-@app.route('/request_reset_password', methods=['GET', 'POST'])
+# Mail Configuration
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = 'transactionsfinance355@gmail.com'
+app.config['MAIL_PASSWORD'] = 'rvzxngpossphfgzm'
+
+@app.route('/request_reset_password', methods=['POST'])
 def request_reset_password():
-    if request.method == 'POST':
-        email = request.form['email']
-        user = User.query.filter_by(email=email).first()
-        if user:
-            otp = generate_otp()
-            store_otp(email, otp)
-            msg = Message('Password Reset Request', sender='noreply@yourapp.com', recipients=[email])
-            msg.body = f"""
-Hello, {user.username}
+    data = request.get_json()
+    email = data.get('email')
 
-Here's the verification code to reset your password:
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
 
-{otp}
-
-To reset your password, enter this verification code when prompted.
-
-This code will expire in 5 minutes.
-
-If you did not request this password reset, please ignore this email.
-"""
-            mail.send(msg)
-            flash('An email with an OTP has been sent to your email address.', 'success')
-            return redirect(url_for('verify_otp', email=email))
-        else:
-            flash('User with this email does not exist.', 'danger')
-    return render_template('request_reset_password.html')
+    user = User.query.filter(User.email.ilike(email)).first()
     if not user:
-        logging.warning(f"No user found with email: {email}")
         return jsonify({"error": "User with this email does not exist"}), 404
 
     otp = generate_otp()
     store_otp(email, otp)
 
     username = user.username
-    logging.debug(f"Generated OTP: {otp} for user: {username}")
 
     msg = Message('Password Reset Request', sender='noreply@yourapp.com', recipients=[email])
     msg.body = f"""
@@ -1440,10 +1427,8 @@ If you did not request this password reset, please ignore this email.
 
     try:
         mail.send(msg)
-        logging.info(f"OTP email sent to {email}")
         return jsonify({"message": "OTP sent to your email"}), 200
     except Exception as e:
-        logging.error(f"Failed to send OTP email to {email}: {e}", exc_info=True)
         return jsonify({"error": f"Failed to send OTP email: {e}"}), 500
 
 
@@ -1455,8 +1440,15 @@ def generate_otp():
 
 def store_otp(email, otp):
     """Store the OTP in the database or any other storage for verification."""
-    # This function should implement the logic to save the OTP
-    logging.debug(f"Storing OTP: {otp} for email: {email}")
+    expiry = datetime.utcnow() + timedelta(minutes=5)
+    otp_entry = OTP.query.filter_by(email=email).first()
+    if otp_entry:
+        otp_entry.otp = otp
+        otp_entry.expiry = expiry
+    else:
+        otp_entry = OTP(email=email, otp=otp, expiry=expiry)
+        db.session.add(otp_entry)
+    db.session.commit()
 
 @app.route('/get_user_role_by_email', methods=['POST'])
 def get_user_role_by_email():
@@ -1486,18 +1478,16 @@ def check_email_exists():
     else:
         return jsonify({'error': 'Email not found'}), 404
 
-@app.route('/verify_otp/<email>', methods=['GET', 'POST'])
-def verify_otp(email):
-    if request.method == 'POST':
-        otp = request.form['otp']
-        otp_entry = OTP.query.filter_by(email=email, otp=otp).first()
-        if otp_entry and datetime.utcnow() < otp_entry.expiry:
-            db.session.delete(otp_entry)
-            db.session.commit()
-            return redirect(url_for('reset_password', email=email))
-        else:
-            flash('Invalid or expired OTP.', 'danger')
-    return render_template('verify_otp.html', email=email)
+@app.route('/verify_otp', methods=['POST'])
+def verify_otp():
+    data = request.get_json()
+    email = data.get('email')
+    otp = data.get('otp')
+
+    if not email or not otp:
+        return jsonify({"error": "Email and OTP are required"}), 400
+
+    otp_entry = OTP.query.filter_by(email=email).first()
 
     if not otp_entry:
         return jsonify({"error": "OTP not requested or does not exist"}), 404
@@ -1512,25 +1502,72 @@ def verify_otp(email):
     if otp_entry.otp != otp:
         return jsonify({"error": "Invalid OTP"}), 400
 
-    return jsonify({"message": "OTP is valid"}), 200  # Fixed return statement
+    return jsonify({"message": "OTP is valid"}), 200
 
-@app.route('/reset_password/<email>', methods=['GET', 'POST'])
-def reset_password(email):
-    if request.method == 'POST':
-        password = request.form['password']
-        confirm_password = request.form['confirm_password']
-        if password != confirm_password:
-            flash('Passwords do not match.', 'danger')
-        else:
-            user = User.query.filter_by(email=email).first()
-            if user:
-                user.set_password(password)
-                db.session.commit()
-                flash('Your password has been reset successfully.', 'success')
-                return redirect(url_for('login'))
-            else:
-                flash('User not found.', 'danger')
-    return render_template('reset_password.html', email=email)
+@app.route('/reset_password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    email = data.get('email')
+    otp = data.get('otp')
+    new_password = data.get('new_password')
+
+    if not email or not otp or not new_password:
+        return jsonify({"error": "Missing email, OTP or new password"}), 400
+
+    otp_entry = OTP.query.filter_by(email=email).first()
+    if not otp_entry:
+        return jsonify({"error": "OTP not requested"}), 404
+
+    if datetime.utcnow() > otp_entry.expiry:
+        return jsonify({"error": "OTP expired"}), 400
+
+    if otp_entry.otp != otp:
+        return jsonify({"error": "Invalid OTP"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User with this email does not exist"}), 404
+
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    db.session.delete(otp_entry)
+    db.session.commit()
+
+    return jsonify({"message": "Password reset successfully"}), 200
+
+@app.route('/request_new_otp', methods=['POST'])
+def request_new_otp():
+    data = request.get_json()
+    email = data.get('email')
+
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User with this email does not exist"}), 404
+
+    otp = generate_otp()
+    store_otp(email, otp)
+
+    username = user.username
+    msg = Message('Password Reset Request', sender='noreply@yourapp.com', recipients=[email])
+    msg.body = f"""
+    Hello, {username}
+
+    Here's the verification code to reset your password:
+
+    {otp}
+
+    To reset your password, enter this verification code when prompted.
+
+    This code will expire in 5 minutes.
+
+    If you did not request this password reset, please ignore this email.
+    """
+    mail.send(msg)
+
+    return jsonify({"message": "New OTP sent to your email"}), 200
 # Simplified POS routes
 @app.route('/pos_simple')
 @login_required(roles=['cashier', 'manager', 'admin'])
