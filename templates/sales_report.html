@@ -235,7 +235,8 @@
 
         const deleteButtons = document.querySelectorAll('.delete-receipt-btn');
         deleteButtons.forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', function(event) {
+                event.stopPropagation();
                 const receiptNumber = this.dataset.receiptNumber;
                 if (confirm(`Are you sure you want to delete receipt #${receiptNumber}?`)) {
                     const form = document.createElement('form');
@@ -244,6 +245,13 @@
                     document.body.appendChild(form);
                     form.submit();
                 }
+            });
+        });
+
+        const printButtons = document.querySelectorAll('.btn-outline-secondary');
+        printButtons.forEach(button => {
+            button.addEventListener('click', function(event) {
+                event.stopPropagation();
             });
         });
     });
