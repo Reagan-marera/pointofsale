@@ -899,14 +899,11 @@ def inventory_management():
         Product.dealer_id == dealer_id if dealer_id else True
     ).scalar() or 0
 
-    total_purchase_amount = db.session.query(
-        func.sum(InventoryMovement.quantity * Product.buying_price)
-    ).join(
-        Product
-    ).filter(
-        InventoryMovement.movement_type == 'purchase',
-        Product.dealer_id == dealer_id if dealer_id else True
-    ).scalar() or 0
+    products_query = Product.query
+    if dealer_id:
+        products_query = products_query.filter(Product.dealer_id == dealer_id)
+
+    total_purchase_amount = sum(p.buying_price * p.current_stock for p in products_query.all())
 
     # Expenses remain global (not dealer-specific)
     total_expense_amount = db.session.query(func.sum(Expense.amount)).scalar() or 0
