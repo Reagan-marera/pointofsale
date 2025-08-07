@@ -273,49 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Checkout button
-    document.getElementById('checkout-btn').addEventListener('click', function() {
-        if (cart.length === 0) {
-            alert('Cart is empty! Please add products before checkout.');
-            return;
-        }
-
-        const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
-        const customerId = document.getElementById('customer-select').value || null;
-        const splitPayment = document.getElementById('split-payment').checked;
-
-        const saleData = {
-            items: cart,
-            customer_id: customerId,
-            payment_method: paymentMethod,
-            split_payment: splitPayment
-        };
-
-        fetch('/api/sales', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(saleData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            alert('Sale completed successfully!');
-            // Print receipt or clear cart as needed
-            cart = [];
-            document.getElementById('cart-items').innerHTML = '';
-            updateCartTotals();
-            document.getElementById('barcode-input').focus();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error completing sale. Please try again.');
-        });
-    });
-
     let lastReceiptNumber = null;
-
-    // ... (rest of the code)
 
     // Checkout button
     document.getElementById('checkout-btn').addEventListener('click', function() {
