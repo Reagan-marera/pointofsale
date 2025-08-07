@@ -109,9 +109,12 @@
                         <td class="text-end">KSh {{ "%.2f"|format(sale.total_amount) }}</td>
                         <td>{{ sale.payment_method|capitalize }}</td>
                         <td>
-                            <a href="{{ url_for('view_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-receipt"></i>
+                            <a href="{{ url_for('print_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                                <i class="bi bi-printer"></i>
                             </a>
+                            <button class="btn btn-sm btn-outline-danger delete-receipt-btn" data-receipt-number="{{ sale.receipt_number }}">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </td>
                     </tr>
                     <tr>
@@ -228,6 +231,20 @@
                     }
                 }
             }
+        });
+
+        const deleteButtons = document.querySelectorAll('.delete-receipt-btn');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const receiptNumber = this.dataset.receiptNumber;
+                if (confirm(`Are you sure you want to delete receipt #${receiptNumber}?`)) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/receipt/${receiptNumber}/delete`;
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
         });
     });
 </script>
