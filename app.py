@@ -674,74 +674,85 @@ def search_products():
 @app.route('/api/sales', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
 def create_sale():
-    data = request.get_json()
-    items = data.get('items', [])
-    customer_id = data.get('customer_id')
-    payment_method = data.get('payment_method', 'cash')
-    split_payment = data.get('split_payment', False)
+    app.logger.info("Received request to create a new sale")
+    try:
+        data = request.get_json()
+        app.logger.info(f"Request data: {data}")
+        items = data.get('items', [])
+        customer_id = data.get('customer_id')
+        payment_method = data.get('payment_method', 'cash')
+        split_payment = data.get('split_payment', False)
 
-    if not items:
-        return jsonify({'error': 'No items in cart.'}), 400
+        if not items:
+            app.logger.warning("Checkout failed: No items in cart")
+            return jsonify({'error': 'No items in cart.'}), 400
 
-    subtotal = 0
-    tax = 0
-    for item in items:
-        product = Product.query.get(item['id'])
-        if product:
-            item_total = product.selling_price * item['quantity']
-            subtotal += item_total
-            if product.vatable:
-                tax += item_total * product.tax_rate
+        subtotal = 0
+        tax = 0
+        for item in items:
+            product = Product.query.get(item['id'])
+            if product:
+                item_total = product.selling_price * item['quantity']
+                subtotal += item_total
+                if product.vatable:
+                    tax += item_total * product.tax_rate
 
-    total = subtotal + tax
+        total = subtotal + tax
+        app.logger.info(f"Calculated totals: subtotal={subtotal}, tax={tax}, total={total}")
 
-    sale = Sale(
-        receipt_number=Sale.generate_receipt_number(),
-        customer_id=customer_id,
-        user_id=session['user_id'],
-        subtotal=subtotal,
-        tax_amount=tax,
-        total_amount=total,
-        payment_method=payment_method,
-        channel='offline',
-        points_earned=int(total // 100),
-        split_payment=split_payment,
-        location_id=session.get('location_id')
-    )
-    db.session.add(sale)
+        sale = Sale(
+            receipt_number=Sale.generate_receipt_number(),
+            customer_id=customer_id,
+            user_id=session['user_id'],
+            subtotal=subtotal,
+            tax_amount=tax,
+            total_amount=total,
+            payment_method=payment_method,
+            channel='offline',
+            points_earned=int(total // 100),
+            split_payment=split_payment,
+            location_id=session.get('location_id')
+        )
+        db.session.add(sale)
+        app.logger.info(f"Created new sale with receipt number: {sale.receipt_number}")
 
-    if customer_id:
-        customer = Customer.query.get(customer_id)
-        if customer:
-            customer.add_loyalty_points(int(total // 100))
+        if customer_id:
+            customer = Customer.query.get(customer_id)
+            if customer:
+                customer.add_loyalty_points(int(total // 100))
 
-    db.session.commit()
+        db.session.commit()
+        app.logger.info("Committed sale to database")
 
-    for item in items:
-        product = Product.query.get(item['id'])
-        if product:
-            sale_item = SaleItem(
-                sale_id=sale.id,
-                product_id=product.id,
-                quantity=item['quantity'],
-                unit_price=item['price'],
-                total_price=item['price'] * item['quantity']
-            )
-            db.session.add(sale_item)
+        for item in items:
+            product = Product.query.get(item['id'])
+            if product:
+                sale_item = SaleItem(
+                    sale_id=sale.id,
+                    product_id=product.id,
+                    quantity=item['quantity'],
+                    unit_price=item['price'],
+                    total_price=item['price'] * item['quantity']
+                )
+                db.session.add(sale_item)
 
-            product.current_stock -= item['quantity']
+                product.current_stock -= item['quantity']
 
-            movement = InventoryMovement(
-                product_id=product.id,
-                movement_type='sale',
-                quantity=-item['quantity'],
-                reference_id=sale.id
-            )
-            db.session.add(movement)
+                movement = InventoryMovement(
+                    product_id=product.id,
+                    movement_type='sale',
+                    quantity=-item['quantity'],
+                    reference_id=sale.id
+                )
+                db.session.add(movement)
 
-    db.session.commit()
+        db.session.commit()
+        app.logger.info("Committed sale items and inventory movements to database")
 
-    return jsonify({'success': True, 'receipt_number': sale.receipt_number})
+        return jsonify({'success': True, 'receipt_number': sale.receipt_number})
+    except Exception as e:
+        app.logger.error(f"Error creating sale: {e}", exc_info=True)
+        return jsonify({'error': 'An internal error occurred.'}), 500
 
 @app.route('/receipt/<receipt_number>')
 @login_required(roles=['cashier', 'manager', 'admin'])
