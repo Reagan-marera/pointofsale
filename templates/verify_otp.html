@@ -9,7 +9,9 @@
             <div class="card my-5">
                 <div class="card-body">
                     <h3 class="card-title text-center">Verify OTP</h3>
-                    <form method="POST">
+                    <p class="text-center">An OTP has been sent to <strong>{{ email }}</strong>. Please enter it below.</p>
+                    <form method="POST" action="{{ url_for('verify_otp_page') }}">
+                        <input type="hidden" name="email" value="{{ email }}">
                         <div class="mb-3">
                             <label for="otp" class="form-label">OTP</label>
                             <input type="text" class="form-control" id="otp" name="otp" required>

@@ -1394,32 +1394,45 @@ app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = 'transactionsfinance355@gmail.com'
 app.config['MAIL_PASSWORD'] = 'rvzxngpossphfgzm'
 
-@app.route('/request_reset_password', methods=['POST'])
+# --- Password Reset Web Flow ---
+
+@app.route('/request_reset_password', methods=['GET', 'POST'])
 def request_reset_password():
-    data = request.get_json()
-    email = data.get('email')
+    if request.method == 'GET':
+        return render_template('request_reset_password.html')
+
+    # Handle POST for both form and JSON
+    if request.is_json:
+        data = request.get_json()
+        email = data.get('email')
+    else:
+        email = request.form.get('email')
 
     if not email:
-        return jsonify({"error": "Email is required"}), 400
+        if request.is_json:
+            return jsonify({"error": "Email is required"}), 400
+        flash("Email is required", "danger")
+        return redirect(url_for('request_reset_password'))
 
     user = User.query.filter(User.email.ilike(email)).first()
     if not user:
-        return jsonify({"error": "User with this email does not exist"}), 404
+        if request.is_json:
+            return jsonify({"error": "User with this email does not exist"}), 404
+        # For web, don't reveal user existence. Redirect to a generic page.
+        flash("If an account with that email exists, an OTP has been sent.", "info")
+        return redirect(url_for('verify_otp_page', email=email))
 
     otp = generate_otp()
     store_otp(email, otp)
-
     username = user.username
 
-    msg = Message('Password Reset Request', sender='noreply@yourapp.com', recipients=[email])
+    msg = Message('Password Reset Request', sender=app.config['MAIL_USERNAME'], recipients=[email])
     msg.body = f"""
     Hello, {username}
 
     Here's the verification code to reset your password:
 
     {otp}
-
-    To reset your password, enter this verification code when prompted.
 
     This code will expire in 5 minutes.
 
@@ -1428,10 +1441,84 @@ def request_reset_password():
 
     try:
         mail.send(msg)
-        return jsonify({"message": "OTP sent to your email"}), 200
+        if request.is_json:
+            return jsonify({"message": "OTP sent to your email"}), 200
+        flash("OTP sent to your email.", "success")
+        return redirect(url_for('verify_otp_page', email=email))
     except Exception as e:
-        return jsonify({"error": f"Failed to send OTP email: {e}"}), 500
+        app.logger.error(f"Failed to send OTP email: {e}")
+        if request.is_json:
+            return jsonify({"error": f"Failed to send OTP email: {str(e)}"}), 500
+        flash(f"Failed to send OTP email.", "danger")
+        return redirect(url_for('request_reset_password'))
 
+@app.route('/verify_otp_page', methods=['GET', 'POST'])
+def verify_otp_page():
+    email = request.args.get('email') or request.form.get('email')
+    if request.method == 'GET':
+        if not email:
+            flash("No email provided for OTP verification.", "danger")
+            return redirect(url_for('request_reset_password'))
+        return render_template('verify_otp.html', email=email)
+
+    # Handle POST
+    otp = request.form.get('otp')
+    if not email or not otp:
+        flash("Email and OTP are required.", "danger")
+        return redirect(url_for('verify_otp_page', email=email))
+
+    otp_entry = OTP.query.filter_by(email=email).first()
+
+    if not otp_entry or otp_entry.otp != otp:
+        flash("Invalid OTP.", "danger")
+        return redirect(url_for('verify_otp_page', email=email))
+
+    if datetime.utcnow() > otp_entry.expiry:
+        flash("OTP has expired. Please request a new one.", "warning")
+        return redirect(url_for('request_reset_password'))
+
+    # OTP is valid, redirect to reset password page
+    flash("OTP verified. Please reset your password.", "success")
+    return redirect(url_for('reset_password_page', email=email, otp=otp))
+
+@app.route('/reset_password_page', methods=['GET', 'POST'])
+def reset_password_page():
+    email = request.args.get('email') or request.form.get('email')
+    otp = request.args.get('otp') or request.form.get('otp')
+
+    if request.method == 'GET':
+        if not email or not otp:
+            flash("Invalid request for password reset.", "danger")
+            return redirect(url_for('login'))
+        return render_template('reset_password.html', email=email, otp=otp)
+
+    # Handle POST
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if not new_password or new_password != confirm_password:
+        flash("Passwords do not match.", "danger")
+        return redirect(url_for('reset_password_page', email=email, otp=otp))
+
+    # Re-verify OTP before resetting password
+    otp_entry = OTP.query.filter_by(email=email, otp=otp).first()
+    if not otp_entry or datetime.utcnow() > otp_entry.expiry:
+        flash("Invalid or expired OTP. Please start over.", "danger")
+        return redirect(url_for('request_reset_password'))
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('request_reset_password'))
+
+    user.set_password(new_password)
+    db.session.delete(otp_entry)
+    db.session.commit()
+
+    flash("Password reset successfully. Please log in.", "success")
+    return redirect(url_for('login'))
+
+# --- Password Reset API Endpoints ---
 
 # Helper Functions
 def generate_otp():
@@ -1529,8 +1616,7 @@ def reset_password():
     if not user:
         return jsonify({"error": "User with this email does not exist"}), 404
 
-    user.password_hash = generate_password_hash(new_password)
-    db.session.commit()
+    user.set_password(new_password)
     db.session.delete(otp_entry)
     db.session.commit()
 
@@ -1552,7 +1638,7 @@ def request_new_otp():
     store_otp(email, otp)
 
     username = user.username
-    msg = Message('Password Reset Request', sender='noreply@yourapp.com', recipients=[email])
+    msg = Message('Password Reset Request', sender=app.config['MAIL_USERNAME'], recipients=[email])
     msg.body = f"""
     Hello, {username}
 
