@@ -109,7 +109,7 @@
                         <td class="text-end">KSh {{ "%.2f"|format(sale.total_amount) }}</td>
                         <td>{{ sale.payment_method|capitalize }}</td>
                         <td>
-                            <a href="{{ url_for('print_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                            <a href="{{ url_for('print_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-secondary print-receipt-btn" target="_blank">
                                 <i class="bi bi-printer"></i>
                             </a>
                             <button class="btn btn-sm btn-outline-danger delete-receipt-btn" data-receipt-number="{{ sale.receipt_number }}">
@@ -248,7 +248,7 @@
             });
         });
 
-        const printButtons = document.querySelectorAll('.btn-outline-secondary');
+        const printButtons = document.querySelectorAll('.print-receipt-btn');
         printButtons.forEach(button => {
             button.addEventListener('click', function(event) {
                 event.stopPropagation();
