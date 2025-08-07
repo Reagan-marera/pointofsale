@@ -238,11 +238,21 @@
             button.addEventListener('click', function() {
                 const receiptNumber = this.dataset.receiptNumber;
                 if (confirm(`Are you sure you want to delete receipt #${receiptNumber}?`)) {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = `/receipt/${receiptNumber}/delete`;
-                    document.body.appendChild(form);
-                    form.submit();
+                    fetch(`/receipt/${receiptNumber}/delete`, {
+                        method: 'DELETE',
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.reload();
+                        } else {
+                            alert('Failed to delete receipt.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while deleting the receipt.');
+                    });
                 }
             });
         });
