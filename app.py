@@ -900,7 +900,7 @@ def inventory_management():
     ).scalar() or 0
 
     total_purchase_amount = db.session.query(
-        func.sum(InventoryMovement.quantity * InventoryMovement.unit_price)
+        func.sum(InventoryMovement.quantity * Product.buying_price)
     ).join(
         Product
     ).filter(
