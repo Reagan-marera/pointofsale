@@ -778,7 +778,7 @@ def delete_receipt(receipt_number):
     db.session.commit()
 
     flash(f'Receipt #{receipt_number} deleted successfully.', 'success')
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('sales_report'))
 @app.route('/purchase_orders/<int:order_id>/receive', methods=['POST'])
 @login_required(roles=['manager'])
 def receive_purchase_order(order_id):
