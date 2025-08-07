@@ -766,7 +766,7 @@ def print_receipt(receipt_number):
     sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
     return render_template('receipt_print.html', sale=sale)
 
-@app.route('/receipt/<receipt_number>/delete', methods=['POST'])
+@app.route('/receipt/<receipt_number>/delete', methods=['DELETE'])
 @login_required(roles=['admin'])
 def delete_receipt(receipt_number):
     app.logger.info(f"Attempting to delete receipt: {receipt_number}")
@@ -781,7 +781,7 @@ def delete_receipt(receipt_number):
 
     flash(f'Receipt #{receipt_number} deleted successfully.', 'success')
     app.logger.info(f"Successfully deleted receipt: {receipt_number}")
-    return redirect(url_for('sales_report'))
+    return jsonify({'success': True})
 @app.route('/purchase_orders/<int:order_id>/receive', methods=['POST'])
 @login_required(roles=['manager'])
 def receive_purchase_order(order_id):
