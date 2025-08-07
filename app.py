@@ -749,6 +749,12 @@ def view_receipt(receipt_number):
     sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
     return render_template('receipt.html', sale=sale)
 
+@app.route('/receipt/print/<receipt_number>')
+@login_required(roles=['cashier', 'manager', 'admin'])
+def print_receipt(receipt_number):
+    sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
+    return render_template('receipt_print.html', sale=sale)
+
 @app.route('/receipt/<receipt_number>/delete', methods=['POST'])
 @login_required(roles=['admin'])
 def delete_receipt(receipt_number):
