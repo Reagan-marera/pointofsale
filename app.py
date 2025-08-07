@@ -421,21 +421,20 @@ def daily_report():
 def supplier_report():
     suppliers = Supplier.query.all()
     supplier_id = request.args.get('supplier_id', type=int)
-    products = []
+    products_data = []
 
     if supplier_id:
-        sale_items = SaleItem.query.join(Product).filter(Product.supplier_id == supplier_id).all()
-        product_sales = {}
-        for item in sale_items:
-            if item.product_id not in product_sales:
-                product_sales[item.product_id] = {'items_sold': 0, 'total_sales': 0, 'total_profit': 0, 'name': item.product.name}
-            product_sales[item.product_id]['items_sold'] += item.quantity
-            product_sales[item.product_id]['total_sales'] += item.total_price
-            product_sales[item.product_id]['total_profit'] += (item.unit_price - item.product.buying_price) * item.quantity
+        products_data = db.session.query(
+            Product.name,
+            func.sum(SaleItem.quantity).label('items_sold'),
+            func.sum(SaleItem.total_price).label('total_sales'),
+            func.sum((SaleItem.unit_price - Product.buying_price) * SaleItem.quantity).label('total_profit')
+        ).join(SaleItem, SaleItem.product_id == Product.id)\
+         .filter(Product.supplier_id == supplier_id)\
+         .group_by(Product.name)\
+         .all()
 
-        products = list(product_sales.values())
-
-    return render_template('supplier_report.html', suppliers=suppliers, products=products)
+    return render_template('supplier_report.html', suppliers=suppliers, products=products_data)
 
 @app.route('/admin/reports/sales')
 @login_required(roles=['manager'])
@@ -657,26 +656,24 @@ def add_product():
 def pos():
     return render_template('pos.html')
 
-@app.route('/api/products')
-def get_products():
-    search = request.args.get('search')
-    query = Product.query
+@app.route('/api/products/search')
+def search_products():
+    search_term = request.args.get('q')
+    if not search_term:
+        return jsonify([])
 
-    if search:
-        query = query.filter(
-            or_(
-                Product.name.ilike(f'%{search}%'),
-                Product.barcode == search
-            )
+    products = Product.query.filter(
+        or_(
+            Product.name.ilike(f'%{search_term}%'),
+            Product.barcode.ilike(f'%{search_term}%')
         )
+    ).all()
 
-    products = query.all()
+    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price} for p in products])
 
-    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'selling_price': p.selling_price} for p in products])
-
-@app.route('/api/checkout', methods=['POST'])
+@app.route('/api/sales', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
-def checkout():
+def create_sale():
     data = request.get_json()
     items = data.get('items', [])
     customer_id = data.get('customer_id')
@@ -686,7 +683,6 @@ def checkout():
     if not items:
         return jsonify({'error': 'No items in cart.'}), 400
 
-    # Calculate totals
     subtotal = 0
     tax = 0
     for item in items:
@@ -699,8 +695,6 @@ def checkout():
 
     total = subtotal + tax
 
-    # Create sale
-    points_earned = int(total // 100)
     sale = Sale(
         receipt_number=Sale.generate_receipt_number(),
         customer_id=customer_id,
@@ -710,7 +704,7 @@ def checkout():
         total_amount=total,
         payment_method=payment_method,
         channel='offline',
-        points_earned=points_earned,
+        points_earned=int(total // 100),
         split_payment=split_payment,
         location_id=session.get('location_id')
     )
@@ -719,10 +713,10 @@ def checkout():
     if customer_id:
         customer = Customer.query.get(customer_id)
         if customer:
-            customer.add_loyalty_points(points_earned)
+            customer.add_loyalty_points(int(total // 100))
+
     db.session.commit()
 
-    # Add sale items and update inventory
     for item in items:
         product = Product.query.get(item['id'])
         if product:
@@ -735,10 +729,8 @@ def checkout():
             )
             db.session.add(sale_item)
 
-            # Update product stock
             product.current_stock -= item['quantity']
 
-            # Record inventory movement
             movement = InventoryMovement(
                 product_id=product.id,
                 movement_type='sale',
@@ -747,32 +739,9 @@ def checkout():
             )
             db.session.add(movement)
 
-    # Create accounting entries
-    revenue_entry = AccountingEntry(
-        account_type='revenue',
-        account_name='Sales Revenue',
-        credit_amount=subtotal,
-        reference_id=sale.id,
-        description=f'Sale #{sale.receipt_number}'
-    )
-
-    tax_entry = AccountingEntry(
-        account_type='liability',
-        account_name='VAT Payable',
-        credit_amount=tax,
-        reference_id=sale.id,
-        description=f'VAT for sale #{sale.receipt_number}'
-    )
-
-    db.session.add(revenue_entry)
-    db.session.add(tax_entry)
     db.session.commit()
 
-    return jsonify({
-        'success': True,
-        'receipt_number': sale.receipt_number,
-        'total': total
-    })
+    return jsonify({'success': True, 'receipt_number': sale.receipt_number})
 
 @app.route('/receipt/<receipt_number>')
 @login_required(roles=['cashier', 'manager', 'admin'])
@@ -1585,71 +1554,6 @@ def add_to_cart_simple():
 
     return jsonify({'success': True, 'cart': cart})
 
-@app.route('/api/checkout_simple', methods=['POST'])
-@login_required(roles=['cashier', 'manager', 'admin'])
-def checkout_simple():
-    cart = session.get('cart', [])
-
-    if not cart:
-        return jsonify({'success': False, 'error': 'Cart is empty'})
-
-    subtotal = 0
-    tax = 0
-
-    for item in cart:
-        product = Product.query.get(item['id'])
-        if not product:
-            return jsonify({'success': False, 'error': f'Product with id {item["id"]} not found'})
-
-        if product.current_stock < item['quantity']:
-            return jsonify({'success': False, 'error': f'Not enough stock for {product.name}'})
-
-        item_total = item['price'] * item['quantity']
-        subtotal += item_total
-        if product.vatable:
-            tax += item_total * product.tax_rate
-
-    total = subtotal + tax
-
-    sale = Sale(
-        receipt_number=Sale.generate_receipt_number(),
-        user_id=session['user_id'],
-        subtotal=subtotal,
-        tax_amount=tax,
-        total_amount=total,
-        payment_method='cash', # Simplified for now
-        channel='offline',
-        location_id=session.get('location_id')
-    )
-    db.session.add(sale)
-    db.session.commit()
-
-    for item in cart:
-        product = Product.query.get(item['id'])
-        sale_item = SaleItem(
-            sale_id=sale.id,
-            product_id=product.id,
-            quantity=item['quantity'],
-            unit_price=item['price'],
-            total_price=item['price'] * item['quantity']
-        )
-        db.session.add(sale_item)
-
-        product.current_stock -= item['quantity']
-
-        movement = InventoryMovement(
-            product_id=product.id,
-            movement_type='sale',
-            quantity=-item['quantity'],
-            reference_id=sale.id
-        )
-        db.session.add(movement)
-
-    db.session.commit()
-
-    session.pop('cart', None)
-
-    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True)
