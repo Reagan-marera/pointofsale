@@ -767,7 +767,7 @@ def print_receipt(receipt_number):
     return render_template('receipt_print.html', sale=sale)
 
 @app.route('/receipt/<receipt_number>/delete', methods=['POST'])
-@login_required(roles=['admin'])
+@login_required(roles=['admin', 'manager', 'cashier'])
 def delete_receipt(receipt_number):
     sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
 
