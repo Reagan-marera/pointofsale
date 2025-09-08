@@ -60,25 +60,6 @@
                 <h5>Payment</h5>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <label for="customer-select" class="form-label">Customer (Optional)</label>
-                    <select class="form-select" id="customer-select">
-                        <option value="">Select a customer</option>
-                        {% for customer in customers %}
-                        <option value="{{ customer.id }}">{{ customer.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <div id="customer-points-container" class="mt-2" style="display: none;">
-                        <p>Loyalty Points: <span id="customer-points">0</span></p>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="redeem-points">
-                            <label class="form-check-label" for="redeem-points">
-                                Redeem Points
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="table-responsive mb-3">
                     <table class="table table-sm">
                         <tbody>
