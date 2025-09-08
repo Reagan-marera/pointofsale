@@ -190,25 +190,32 @@ def login_required(roles=['cashier']):
 @app.route('/dashboard')
 @login_required(roles=['cashier', 'manager', 'admin'])
 def dashboard():
+    # Base query for sales
+    base_sales_query = Sale.query
+    if session['role'] == 'cashier':
+        base_sales_query = base_sales_query.filter(Sale.user_id == session['user_id'])
+
     # Get basic stats for dashboard
     total_products = Product.query.count()
     low_stock_products = Product.query.filter(Product.current_stock < Product.min_stock_level).count()
     today = datetime.today().date()
-    today_sales = Sale.query.filter(func.date(Sale.sale_date) == today).count()
+
+    today_sales_query = base_sales_query.filter(func.date(Sale.sale_date) == today)
+    today_sales = today_sales_query.count()
 
     # Get sales for the last 7 days
     sales_this_week = []
     max_sales = 0
     for i in range(7):
         day = today - timedelta(days=i)
-        sales = db.session.query(func.sum(Sale.total_amount)).filter(func.date(Sale.sale_date) == day).scalar() or 0
+        sales = base_sales_query.with_entities(func.sum(Sale.total_amount)).filter(func.date(Sale.sale_date) == day).scalar() or 0
         sales_this_week.append({'date': day.strftime('%a'), 'total_sales': sales})
         if sales > max_sales:
             max_sales = sales
     sales_this_week.reverse()
 
     # Get sales by payment method
-    sales_by_payment_method = db.session.query(Sale.payment_method, func.sum(Sale.total_amount).label('total')).group_by(Sale.payment_method).all()
+    sales_by_payment_method = base_sales_query.with_entities(Sale.payment_method, func.sum(Sale.total_amount).label('total')).group_by(Sale.payment_method).all()
 
     return render_template('dashboard.html',
                          total_products=total_products,
@@ -1011,13 +1018,16 @@ def delete_supplier(supplier_id):
 
 
 @app.route('/expenses')
-@login_required('manager')
+@login_required(roles=['manager', 'cashier'])
 def list_expenses():
-    expenses = Expense.query.order_by(Expense.date.desc()).all()
+    query = Expense.query.order_by(Expense.date.desc())
+    if session['role'] == 'cashier':
+        query = query.filter_by(user_id=session['user_id'])
+    expenses = query.all()
     return render_template('expenses/list.html', expenses=expenses)
 
 @app.route('/expenses/add', methods=['GET', 'POST'])
-@login_required('manager')
+@login_required(roles=['manager', 'cashier'])
 def add_expense():
     if request.method == 'POST':
         date = datetime.strptime(request.form['date'], '%Y-%m-%d')
@@ -1031,7 +1041,8 @@ def add_expense():
             payee_name=payee_name,
             transaction_details=transaction_details,
             description=description,
-            amount=amount
+            amount=amount,
+            user_id=session['user_id']
         )
 
         db.session.add(expense)

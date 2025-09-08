@@ -58,7 +58,7 @@
                             </a>
                         </li>
                         {% endif %}
-                        {% if session['role'] == 'manager' %}
+                        {% if session['role'] in ['manager', 'cashier'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'list_expenses' %}active{% endif %}" href="{{ url_for('list_expenses') }}">
                                 <i class="fas fa-receipt"></i> Expenses
@@ -88,6 +88,8 @@
                                 <i class="fas fa-user-chart"></i> Employee Reports
                             </a>
                         </li>
+                        {% endif %}
+                        {% if session.role in ['manager', 'admin', 'cashier'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'daily_report' %}active{% endif %}" href="{{ url_for('daily_report') }}">
                                 <i class="fas fa-calendar-day"></i> Daily Reports

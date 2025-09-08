@@ -197,6 +197,10 @@ class Expense(db.Model):
     transaction_details = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text)
     amount = db.Column(db.Float, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    user = db.relationship('User', backref='expenses')
+
 
     def __repr__(self):
         return f'<Expense {self.payee_name}>'
