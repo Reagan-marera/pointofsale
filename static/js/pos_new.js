@@ -254,12 +254,52 @@ document.addEventListener('DOMContentLoaded', function() {
         const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const taxableItems = cart.filter(item => item.vatable);
         const tax = taxableItems.reduce((sum, item) => sum + (item.price * item.quantity * taxRate), 0);
-        const total = subtotal + tax;
+        let total = subtotal + tax;
+
+        const redeemCheckbox = document.getElementById('redeem-points');
+        const pointsSpan = document.getElementById('customer-points');
+
+        if (redeemCheckbox.checked) {
+            const points = parseInt(pointsSpan.textContent);
+            const discount = Math.min(points, total);
+            total -= discount;
+            // You might want to display the discount amount somewhere in the UI
+        }
 
         document.getElementById('subtotal').textContent = `KSh ${subtotal.toFixed(2)}`;
         document.getElementById('tax').textContent = `KSh ${tax.toFixed(2)}`;
         document.getElementById('total').textContent = `KSh ${total.toFixed(2)}`;
     }
+
+    // Customer selection
+    document.getElementById('customer-select').addEventListener('change', function() {
+        const customerId = this.value;
+        const pointsContainer = document.getElementById('customer-points-container');
+        const pointsSpan = document.getElementById('customer-points');
+        const redeemCheckbox = document.getElementById('redeem-points');
+
+        if (customerId) {
+            fetch(`/api/customers/${customerId}`)
+                .then(response => response.json())
+                .then(customer => {
+                    pointsSpan.textContent = customer.loyalty_points;
+                    pointsContainer.style.display = 'block';
+                    redeemCheckbox.disabled = customer.loyalty_points === 0;
+                })
+                .catch(error => {
+                    console.error('Error fetching customer details:', error);
+                    pointsContainer.style.display = 'none';
+                });
+        } else {
+            pointsContainer.style.display = 'none';
+            pointsSpan.textContent = '0';
+            redeemCheckbox.checked = false;
+        }
+    });
+
+    document.getElementById('redeem-points').addEventListener('change', function() {
+        updateCartTotals();
+    });
 
     // New sale button
     document.getElementById('new-sale-btn').addEventListener('click', function() {
@@ -285,12 +325,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
         const customerId = document.getElementById('customer-select').value || null;
         const splitPayment = document.getElementById('split-payment').checked;
+        const redeemPoints = document.getElementById('redeem-points').checked;
 
         const saleData = {
             items: cart,
             customer_id: customerId,
             payment_method: paymentMethod,
-            split_payment: splitPayment
+            split_payment: splitPayment,
+            redeem_points: redeemPoints
         };
 
         fetch('/api/sales', {

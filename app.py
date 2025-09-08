@@ -660,7 +660,8 @@ def add_product():
 @app.route('/pos')
 @login_required(roles=['cashier', 'manager', 'admin'])
 def pos():
-    return render_template('pos.html')
+    customers = Customer.query.all()
+    return render_template('pos.html', customers=customers)
 
 @app.route('/api/products/search')
 def search_products():
@@ -677,6 +678,16 @@ def search_products():
 
     return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price} for p in products])
 
+@app.route('/api/customers/<int:customer_id>')
+@login_required(roles=['cashier', 'manager', 'admin'])
+def get_customer(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    return jsonify({
+        'id': customer.id,
+        'name': customer.name,
+        'loyalty_points': customer.loyalty_points
+    })
+
 @app.route('/api/sales', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
 def create_sale():
@@ -688,6 +699,7 @@ def create_sale():
         customer_id = data.get('customer_id')
         payment_method = data.get('payment_method', 'cash')
         split_payment = data.get('split_payment', False)
+        redeem_points = data.get('redeem_points', False)
 
         if not items:
             app.logger.warning("Checkout failed: No items in cart")
@@ -706,26 +718,40 @@ def create_sale():
         total = subtotal + tax
         app.logger.info(f"Calculated totals: subtotal={subtotal}, tax={tax}, total={total}")
 
+        discount = 0
+        points_redeemed = 0
+        customer = None
+        if customer_id:
+            customer = Customer.query.get(customer_id)
+
+        if customer and redeem_points and customer.loyalty_points > 0:
+            # Assuming 1 point = 1 KSh
+            discount = min(customer.loyalty_points, total)
+            points_redeemed = int(discount)
+            total -= discount
+            customer.loyalty_points -= points_redeemed
+
+        points_earned = int(total // 100) if not redeem_points else 0
+        if customer:
+            customer.add_loyalty_points(points_earned)
+
+
         sale = Sale(
             receipt_number=Sale.generate_receipt_number(),
             customer_id=customer_id,
             user_id=session['user_id'],
             subtotal=subtotal,
             tax_amount=tax,
+            discount_amount=discount,
             total_amount=total,
             payment_method=payment_method,
             channel='offline',
-            points_earned=int(total // 100),
+            points_earned=points_earned,
             split_payment=split_payment,
             location_id=session.get('location_id')
         )
         db.session.add(sale)
         app.logger.info(f"Created new sale with receipt number: {sale.receipt_number}")
-
-        if customer_id:
-            customer = Customer.query.get(customer_id)
-            if customer:
-                customer.add_loyalty_points(int(total // 100))
 
         db.session.commit()
         app.logger.info("Committed sale to database")
