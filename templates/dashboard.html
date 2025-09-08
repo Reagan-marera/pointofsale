@@ -46,7 +46,6 @@
         </div>
     </div>
     {% endif %}
-    {% if session['role'] in ['admin', 'manager'] %}
     <div class="col-md-3">
         <div class="card text-white bg-success mb-3">
             <div class="card-body">
@@ -58,13 +57,12 @@
                     </div>
                 </div>
             </div>
-            <a href="{{ url_for('sales_report') }}" class="card-footer text-white">
+            <a href="{{ url_for('daily_report') }}" class="card-footer text-white">
                 <span class="float-start">View Details</span>
                 <span class="float-end"><i class="fas fa-arrow-circle-right"></i></span>
             </a>
         </div>
     </div>
-    {% endif %}
     </div>
 </div>
 
