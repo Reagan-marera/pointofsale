@@ -73,43 +73,24 @@ class Dealer(db.Model):
     email = db.Column(db.String(100))
     address = db.Column(db.Text)
 
-class Customer(db.Model):
-    __tablename__ = 'customers'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    phone = db.Column(db.String(20), unique=True)
-    email = db.Column(db.String(100), unique=True)
-    loyalty_points = db.Column(db.Integer, default=0)
-    total_spent = db.Column(db.Float, default=0.0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def add_loyalty_points(self, points):
-        self.loyalty_points += points
-        db.session.commit()
-
 class Sale(db.Model):
     __tablename__ = 'sales'
 
     id = db.Column(db.Integer, primary_key=True)
     receipt_number = db.Column(db.String(20), unique=True, index=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     subtotal = db.Column(db.Float, nullable=False)
     tax_amount = db.Column(db.Float, nullable=False)
-    discount_amount = db.Column(db.Float, default=0.0)
     total_amount = db.Column(db.Float, nullable=False)
     payment_method = db.Column(db.String(20), nullable=False, index=True)
     payment_status = db.Column(db.String(20), default='completed')
     sale_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     channel = db.Column(db.String(20), default='offline')
-    points_earned = db.Column(db.Integer, default=0)
     split_payment = db.Column(db.Boolean, default=False)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
 
     items = db.relationship('SaleItem', backref='sale', cascade='all, delete-orphan')
     location = db.relationship('Location', backref='sales')
-    customer = db.relationship('Customer', backref='purchases')
     user = db.relationship('User', backref='sales')
 
     @classmethod

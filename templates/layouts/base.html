@@ -30,41 +30,48 @@
                                 <i class="fas fa-cash-register"></i> Sales
                             </a>
                         </li>
+                        {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'products' %}active{% endif %}" href="{{ url_for('products') }}">
                                 <i class="fas fa-boxes"></i> Purchases
                             </a>
                         </li>
+                        {% endif %}
+                        {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'inventory_management' %}active{% endif %}" href="{{ url_for('inventory_management') }}">
                                 <i class="fas fa-warehouse"></i> Inventory
                             </a>
                         </li>
+                        {% endif %}
+                        {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'list_suppliers' %}active{% endif %}" href="{{ url_for('list_suppliers') }}">
                                 <i class="fas fa-truck"></i> Suppliers
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'list_customers' %}active{% endif %}" href="{{ url_for('list_customers') }}">
-                                <i class="fas fa-users"></i> Customers
-                            </a>
-                        </li>
+                        {% endif %}
+                        {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'list_financiers' %}active{% endif %}" href="{{ url_for('list_financiers') }}">
                                 <i class="fas fa-hand-holding-usd"></i> Financiers
                             </a>
                         </li>
+                        {% endif %}
+                        {% if session['role'] == 'manager' %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'list_expenses' %}active{% endif %}" href="{{ url_for('list_expenses') }}">
                                 <i class="fas fa-receipt"></i> Expenses
                             </a>
                         </li>
+                        {% endif %}
+                        {% if session['role'] == 'manager' %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'list_dealers' %}active{% endif %}" href="{{ url_for('list_dealers') }}">
                                 <i class="fas fa-handshake"></i> Dealers
                             </a>
                         </li>
+                        {% endif %}
                         {% if session.role in ['manager', 'admin'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'sales_report' %}active{% endif %}" href="{{ url_for('sales_report') }}">

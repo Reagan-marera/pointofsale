@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Customer, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP
+from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP
 from datetime import datetime,timedelta
 import random
 from sqlalchemy.orm import joinedload
@@ -195,7 +195,6 @@ def dashboard():
     low_stock_products = Product.query.filter(Product.current_stock < Product.min_stock_level).count()
     today = datetime.today().date()
     today_sales = Sale.query.filter(func.date(Sale.sale_date) == today).count()
-    total_customers = Customer.query.count()
 
     # Get sales for the last 7 days
     sales_this_week = []
@@ -215,7 +214,6 @@ def dashboard():
                          total_products=total_products,
                          low_stock_products=low_stock_products,
                          today_sales=today_sales,
-                         total_customers=total_customers,
                          sales_this_week=sales_this_week,
                          max_sales=max_sales,
                          sales_by_payment_method=sales_by_payment_method)
@@ -408,7 +406,7 @@ def employee_report():
     return render_template('employee_report.html', users=users, sales_by_employee=sales_by_employee)
 
 @app.route('/admin/reports/daily')
-@login_required(roles=['manager'])
+@login_required(roles=['manager', 'cashier'])
 def daily_report():
     date_str = request.args.get('date')
     if date_str:
@@ -416,9 +414,19 @@ def daily_report():
     else:
         date = datetime.today().date()
 
-    total_sales = db.session.query(func.sum(Sale.total_amount)).filter(func.date(Sale.sale_date) == date).scalar() or 0
-    total_expenses = db.session.query(func.sum(Expense.amount)).filter(func.date(Expense.date) == date).scalar() or 0
-    net_profit = total_sales - total_expenses
+    query = db.session.query(func.sum(Sale.total_amount)).filter(func.date(Sale.sale_date) == date)
+
+    if session['role'] == 'cashier':
+        query = query.filter(Sale.user_id == session['user_id'])
+
+    total_sales = query.scalar() or 0
+
+    # Cashiers should not see expenses and net profit
+    total_expenses = 0
+    net_profit = 0
+    if session['role'] == 'manager':
+        total_expenses = db.session.query(func.sum(Expense.amount)).filter(func.date(Expense.date) == date).scalar() or 0
+        net_profit = total_sales - total_expenses
 
     return render_template('daily_report.html', total_sales=total_sales, total_expenses=total_expenses, net_profit=net_profit)
 
@@ -454,8 +462,7 @@ def sales_report():
     # Build query
     query = Sale.query.options(
         joinedload(Sale.items).joinedload(SaleItem.product),
-        joinedload(Sale.user),
-        joinedload(Sale.customer)
+        joinedload(Sale.user)
     )
     
     if product_search:
@@ -660,8 +667,7 @@ def add_product():
 @app.route('/pos')
 @login_required(roles=['cashier', 'manager', 'admin'])
 def pos():
-    customers = Customer.query.all()
-    return render_template('pos.html', customers=customers)
+    return render_template('pos.html')
 
 @app.route('/api/products/search')
 def search_products():
@@ -678,16 +684,6 @@ def search_products():
 
     return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price} for p in products])
 
-@app.route('/api/customers/<int:customer_id>')
-@login_required(roles=['cashier', 'manager', 'admin'])
-def get_customer(customer_id):
-    customer = Customer.query.get_or_404(customer_id)
-    return jsonify({
-        'id': customer.id,
-        'name': customer.name,
-        'loyalty_points': customer.loyalty_points
-    })
-
 @app.route('/api/sales', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
 def create_sale():
@@ -696,10 +692,8 @@ def create_sale():
         data = request.get_json()
         app.logger.info(f"Request data: {data}")
         items = data.get('items', [])
-        customer_id = data.get('customer_id')
         payment_method = data.get('payment_method', 'cash')
         split_payment = data.get('split_payment', False)
-        redeem_points = data.get('redeem_points', False)
 
         if not items:
             app.logger.warning("Checkout failed: No items in cart")
@@ -718,35 +712,14 @@ def create_sale():
         total = subtotal + tax
         app.logger.info(f"Calculated totals: subtotal={subtotal}, tax={tax}, total={total}")
 
-        discount = 0
-        points_redeemed = 0
-        customer = None
-        if customer_id:
-            customer = Customer.query.get(customer_id)
-
-        if customer and redeem_points and customer.loyalty_points > 0:
-            # Assuming 1 point = 1 KSh
-            discount = min(customer.loyalty_points, total)
-            points_redeemed = int(discount)
-            total -= discount
-            customer.loyalty_points -= points_redeemed
-
-        points_earned = int(total // 100) if not redeem_points else 0
-        if customer:
-            customer.add_loyalty_points(points_earned)
-
-
         sale = Sale(
             receipt_number=Sale.generate_receipt_number(),
-            customer_id=customer_id,
             user_id=session['user_id'],
             subtotal=subtotal,
             tax_amount=tax,
-            discount_amount=discount,
             total_amount=total,
             payment_method=payment_method,
             channel='offline',
-            points_earned=points_earned,
             split_payment=split_payment,
             location_id=session.get('location_id')
         )
@@ -1309,78 +1282,6 @@ def add_financier_credit():
 def list_financier_debits():
     debits = FinancierDebit.query.order_by(FinancierDebit.date.desc()).all()
     return render_template('financiers/debits.html', debits=debits)
-
-# Add a new route for customers
-@app.route('/customers')
-@login_required('manager' and 'admin')
-def list_customers():
-    customers = Customer.query.all()
-    return render_template('customers/list.html', customers=customers)
-
-@app.route('/customers/add', methods=['GET', 'POST'])
-@login_required('manager' and 'admin')
-def add_customer():
-    if request.method == 'POST':
-        name = request.form['name']
-        email = request.form['email']
-        phone = request.form['phone']
-
-        if not name or not email or not phone:
-            flash('Please fill out all fields.', 'danger')
-            return redirect(url_for('add_customer'))
-
-        if Customer.query.filter_by(email=email).first():
-            flash('A customer with this email already exists.', 'danger')
-            return redirect(url_for('add_customer'))
-
-        if Customer.query.filter_by(phone=phone).first():
-            flash('A customer with this phone number already exists.', 'danger')
-            return redirect(url_for('add_customer'))
-
-        new_customer = Customer(
-            name=name,
-            email=email,
-            phone=phone
-        )
-
-        db.session.add(new_customer)
-        db.session.commit()
-
-        flash('Customer added successfully!', 'success')
-        return redirect(url_for('list_customers'))
-
-    return render_template('customers/add.html')
-
-@app.route('/customers/edit/<int:customer_id>', methods=['GET', 'POST'])
-@login_required('manager' and 'admin')
-def edit_customer(customer_id):
-    customer = Customer.query.get_or_404(customer_id)
-
-    if request.method == 'POST':
-        customer.name = request.form['name']
-        customer.email = request.form['email']
-        customer.phone = request.form['phone']
-
-        if not customer.name or not customer.email or not customer.phone:
-            flash('Please fill out all fields.', 'danger')
-            return redirect(url_for('edit_customer', customer_id=customer_id))
-
-        db.session.commit()
-
-        flash('Customer updated successfully!', 'success')
-        return redirect(url_for('list_customers'))
-
-    return render_template('customers/edit.html', customer=customer)
-
-@app.route('/customers/delete/<int:customer_id>', methods=['POST'])
-@login_required('manager' and 'admin')
-def delete_customer(customer_id):
-    customer = Customer.query.get_or_404(customer_id)
-    db.session.delete(customer)
-    db.session.commit()
-
-    flash('Customer deleted successfully!', 'success')
-    return redirect(url_for('list_customers'))
 
 @app.route('/financiers/debits/add', methods=['GET', 'POST'])
 @login_required('manager' and 'admin')
