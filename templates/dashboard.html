@@ -116,30 +116,32 @@
         },
         options: {
             scales: {
-                xAxes: [{
+                x: {
                     time: {
-                        unit: 'date'
+                        unit: 'day'
                     },
-                    gridLines: {
+                    grid: {
                         display: false
                     },
                     ticks: {
                         maxTicksLimit: 7
                     }
-                }],
-                yAxes: [{
+                },
+                y: {
                     ticks: {
                         min: 0,
                         max: {{ max_sales }},
                         maxTicksLimit: 5
                     },
-                    gridLines: {
+                    grid: {
                         color: "rgba(0, 0, 0, .125)",
                     }
-                }],
+                }
             },
-            legend: {
-                display: false
+            plugins: {
+                legend: {
+                    display: false
+                }
             }
         }
     });
