@@ -1082,13 +1082,13 @@ def delete_expense(expense_id):
     flash('Expense deleted successfully!', 'success')
     return redirect(url_for('list_expenses'))
 @app.route('/dealers')
-@login_required('manager')
+@login_required(roles=['manager', 'admin'])
 def list_dealers():
     dealers = Dealer.query.all()
     return render_template('dealers/list.html', dealers=dealers)
 
 @app.route('/dealers/add', methods=['GET', 'POST'])
-@login_required('manager')
+@login_required(roles=['manager', 'admin'])
 def add_dealer():
     if request.method == 'POST':
         name = request.form['name']
@@ -1126,7 +1126,7 @@ def add_dealer():
     return render_template('dealers/add.html')
 
 @app.route('/dealers/edit/<int:dealer_id>', methods=['GET', 'POST'])
-@login_required('manager')
+@login_required(roles=['manager', 'admin'])
 def edit_dealer(dealer_id):
     dealer = Dealer.query.get_or_404(dealer_id)
 
@@ -1149,7 +1149,7 @@ def edit_dealer(dealer_id):
     return render_template('dealers/edit.html', dealer=dealer)
 
 @app.route('/dealers/delete/<int:dealer_id>', methods=['POST'])
-@login_required('manager')
+@login_required(roles=['manager', 'admin'])
 def delete_dealer(dealer_id):
     dealer = Dealer.query.get_or_404(dealer_id)
     db.session.delete(dealer)
