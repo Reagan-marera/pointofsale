@@ -65,7 +65,7 @@
                             </a>
                         </li>
                         {% endif %}
-                        {% if session['role'] == 'manager' %}
+                        {% if session['role'] in ['manager', 'admin'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'list_dealers' %}active{% endif %}" href="{{ url_for('list_dealers') }}">
                                 <i class="fas fa-handshake"></i> Dealers
