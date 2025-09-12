@@ -109,12 +109,16 @@
                         <td class="text-end">KSh {{ "%.2f"|format(sale.total_amount) }}</td>
                         <td>{{ sale.payment_method|capitalize }}</td>
                         <td>
-                            <a href="{{ url_for('print_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-secondary print-receipt-btn" target="_blank">
+                            <a href="{{ url_for('print_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
                                 <i class="bi bi-printer"></i>
                             </a>
-                            <button class="btn btn-sm btn-outline-danger delete-receipt-btn" data-receipt-number="{{ sale.receipt_number }}">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            {% if session['role'] == 'admin' %}
+                            <form action="{{ url_for('delete_sale', sale_id=sale.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete sale #{{ sale.receipt_number }}? This action cannot be undone and will restock the items.');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     <tr>
@@ -233,29 +237,6 @@
             }
         });
 
-        const deleteButtons = document.querySelectorAll('.delete-receipt-btn');
-        deleteButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const receiptNumber = this.dataset.receiptNumber;
-                if (confirm(`Are you sure you want to delete receipt #${receiptNumber}?`)) {
-                    fetch(`/receipt/${receiptNumber}/delete`, {
-                        method: 'DELETE',
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            window.location.reload();
-                        } else {
-                            alert('Failed to delete receipt.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('An error occurred while deleting the receipt.');
-                    });
-                }
-            });
-        });
     });
 </script>
 {% endblock %}
