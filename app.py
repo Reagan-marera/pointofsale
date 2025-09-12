@@ -413,7 +413,7 @@ def employee_report():
     return render_template('employee_report.html', users=users, sales_by_employee=sales_by_employee)
 
 @app.route('/admin/reports/daily')
-@login_required(roles=['manager', 'cashier'])
+@login_required(roles=['manager', 'cashier', 'admin'])
 def daily_report():
     date_str = request.args.get('date')
     if date_str:
@@ -421,21 +421,45 @@ def daily_report():
     else:
         date = datetime.today().date()
 
-    query = db.session.query(func.sum(Sale.total_amount)).filter(func.date(Sale.sale_date) == date)
-
+    # Base query for sales on the selected date
+    sales_query = Sale.query.filter(func.date(Sale.sale_date) == date)
     if session['role'] == 'cashier':
-        query = query.filter(Sale.user_id == session['user_id'])
+        sales_query = sales_query.filter(Sale.user_id == session['user_id'])
 
-    total_sales = query.scalar() or 0
+    # Calculate total sales
+    total_sales = sales_query.with_entities(func.sum(Sale.total_amount)).scalar() or 0
 
-    # Cashiers should not see expenses and net profit
+    # Initialize values for all roles
     total_expenses = 0
     net_profit = 0
-    if session['role'] == 'manager':
-        total_expenses = db.session.query(func.sum(Expense.amount)).filter(func.date(Expense.date) == date).scalar() or 0
-        net_profit = total_sales - total_expenses
 
-    return render_template('daily_report.html', total_sales=total_sales, total_expenses=total_expenses, net_profit=net_profit)
+    # Managers and admins see expenses and net profit
+    if session['role'] in ['manager', 'admin']:
+        # Calculate total expenses for the day
+        total_expenses_query = db.session.query(func.sum(Expense.amount)).filter(func.date(Expense.date) == date)
+        total_expenses = total_expenses_query.scalar() or 0
+
+        # Calculate Cost of Goods Sold (COGS) for the day
+        cogs_query = db.session.query(func.sum(SaleItem.quantity * Product.buying_price))\
+            .join(Sale, Sale.id == SaleItem.sale_id)\
+            .join(Product, Product.id == SaleItem.product_id)\
+            .filter(func.date(Sale.sale_date) == date)
+
+        # If a manager is viewing their own report, this will be filtered.
+        # This assumes a manager might also be a cashier.
+        if session['role'] == 'manager' and 'cashier' in session.get('roles', []):
+             cogs_query = cogs_query.filter(Sale.user_id == session['user_id'])
+
+        total_cogs = cogs_query.scalar() or 0
+
+        # Calculate net profit
+        net_profit = total_sales - total_cogs - total_expenses
+
+    return render_template('daily_report.html',
+                         total_sales=total_sales,
+                         total_expenses=total_expenses,
+                         net_profit=net_profit,
+                         date=date_str if date_str else date.strftime('%Y-%m-%d'))
 
 @app.route('/admin/reports/supplier')
 @login_required(roles=['manager'])
@@ -778,22 +802,32 @@ def print_receipt(receipt_number):
     sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
     return render_template('receipt_print.html', sale=sale)
 
-@app.route('/receipt/<receipt_number>/delete', methods=['DELETE'])
+@app.route('/sales/delete/<int:sale_id>', methods=['POST'])
 @login_required(roles=['admin'])
-def delete_receipt(receipt_number):
-    app.logger.info(f"Attempting to delete receipt: {receipt_number}")
-    app.logger.info(f"User session: {session}")
-    sale = Sale.query.filter_by(receipt_number=receipt_number).first_or_404()
+def delete_sale(sale_id):
+    sale = Sale.query.get_or_404(sale_id)
 
-    # Optional: delete related sale_items if your model requires it
-    SaleItem.query.filter_by(sale_id=sale.id).delete()
+    # Reverse the stock for each item in the sale
+    for item in sale.items:
+        product = item.product
+        product.current_stock += item.quantity
 
+        # Create a reversal inventory movement
+        movement = InventoryMovement(
+            product_id=product.id,
+            movement_type='sale_reversal',
+            quantity=item.quantity,  # Positive quantity
+            reference_id=sale.id,
+            notes=f"Reversal for deleted sale #{sale.receipt_number}"
+        )
+        db.session.add(movement)
+
+    # Delete the sale. Items and movements will be handled by cascades/relationships.
     db.session.delete(sale)
     db.session.commit()
 
-    flash(f'Receipt #{receipt_number} deleted successfully.', 'success')
-    app.logger.info(f"Successfully deleted receipt: {receipt_number}")
-    return jsonify({'success': True})
+    flash(f'Sale #{sale.receipt_number} has been deleted and stock reversed.', 'success')
+    return redirect(url_for('sales_report'))
 @app.route('/purchase_orders/<int:order_id>/receive', methods=['POST'])
 @login_required(roles=['manager'])
 def receive_purchase_order(order_id):
@@ -858,36 +892,23 @@ def finalize_purchase_order(order_id):
 
 
 @app.route('/admin/inventory')
-@login_required(roles=['manager'])
+@login_required(roles=['manager', 'admin'])
 def inventory_management():
-    # Get the selected dealer_id from the request arguments
     dealer_id = request.args.get('dealer_id', type=int)
     product_search = request.args.get('product_search')
-
-    # Fetch all dealers for the filter dropdown
     dealers = Dealer.query.all()
 
-    # Base queries with dealer filtering
+    # Base queries
     products_query = Product.query
     movements_query = InventoryMovement.query.join(Product)
     purchase_orders_query = PurchaseOrder.query
-    sale_items_query = SaleItem.query
+    sales_items_query = db.session.query(SaleItem).join(Product)
 
     if dealer_id:
-        # Apply dealer filter to all queries
         products_query = products_query.filter(Product.dealer_id == dealer_id)
-        
         movements_query = movements_query.filter(Product.dealer_id == dealer_id)
-        
-        purchase_orders_query = purchase_orders_query.join(
-            PurchaseOrderItem
-        ).join(
-            Product
-        ).filter(
-            Product.dealer_id == dealer_id
-        ).distinct()
-        
-        sale_items_query = sale_items_query.join(Product).filter(Product.dealer_id == dealer_id)
+        purchase_orders_query = purchase_orders_query.join(PurchaseOrderItem).join(Product).filter(Product.dealer_id == dealer_id).distinct()
+        sales_items_query = sales_items_query.filter(Product.dealer_id == dealer_id)
 
     if product_search:
         movements_query = movements_query.filter(
@@ -897,30 +918,16 @@ def inventory_management():
             )
         )
 
-    # Execute queries
     products = products_query.all()
     inventory_movements = movements_query.order_by(InventoryMovement.movement_date.desc()).limit(50).all()
     purchase_orders = purchase_orders_query.order_by(PurchaseOrder.order_date.desc()).limit(50).all()
 
-    # Calculate financials with proper filtering
-    total_sales_amount = db.session.query(
-        func.sum(SaleItem.total_price)
-    ).join(
-        Product
-    ).filter(
-        Product.dealer_id == dealer_id if dealer_id else True
-    ).scalar() or 0
-
-    products_query = Product.query
-    if dealer_id:
-        products_query = products_query.filter(Product.dealer_id == dealer_id)
-
-    total_purchase_amount = sum(p.buying_price * p.current_stock for p in products_query.all())
-
-    # Expenses remain global (not dealer-specific)
+    # Financials
+    total_sales_amount = sales_items_query.with_entities(func.sum(SaleItem.total_price)).scalar() or 0
+    total_cogs = sales_items_query.with_entities(func.sum(SaleItem.quantity * Product.buying_price)).scalar() or 0
+    total_purchase_amount = sum(p.buying_price * p.current_stock for p in products)
     total_expense_amount = db.session.query(func.sum(Expense.amount)).scalar() or 0
-
-    net_amount = total_sales_amount - total_purchase_amount - total_expense_amount
+    net_profit = total_sales_amount - total_cogs - total_expense_amount
 
     return render_template('inventory_management.html',
                          products=products,
@@ -931,7 +938,7 @@ def inventory_management():
                          total_sales_amount=total_sales_amount,
                          total_purchase_amount=total_purchase_amount,
                          total_expense_amount=total_expense_amount,
-                         net_amount=net_amount)
+                         net_profit=net_profit)
 
 @app.route('/suppliers')
 @login_required(roles=['manager', 'admin'])
