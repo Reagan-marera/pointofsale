@@ -1,7 +1,5 @@
 {% extends "layouts/base.html" %}
-
 {% block title %}POS Terminal{% endblock %}
-
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">POS Terminal</h1>
@@ -14,7 +12,6 @@
         </button>
     </div>
 </div>
-
 <div class="row">
     <div class="col-md-8">
         <div class="card mb-4">
@@ -33,7 +30,7 @@
                     <input type="text" class="form-control" id="product-search" placeholder="Search by name...">
                     <div id="product-list" class="list-group mt-2"></div>
                 </div>
-                
+
                 <div class="table-responsive">
                     <table class="table table-sm" id="cart-table">
                         <thead>
@@ -53,7 +50,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-4">
         <div class="card mb-4">
             <div class="card-header">
@@ -78,18 +75,16 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <div class="mb-3">
                     <label class="form-label">Payment Method</label>
                     <div class="btn-group w-100" role="group">
                         <input type="radio" class="btn-check" name="payment-method" id="cash" value="cash" checked>
                         <label class="btn btn-outline-primary" for="cash">Cash</label>
-
                         <input type="radio" class="btn-check" name="payment-method" id="mpesa" value="mpesa">
                         <label class="btn btn-outline-primary" for="mpesa">M-Pesa</label>
                     </div>
                 </div>
-
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="split-payment">
                     <label class="form-check-label" for="split-payment">
@@ -130,7 +125,208 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
-<script src="{{ url_for('static', filename='js/pos_new.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM Elements
+    const barcodeInput = document.getElementById('barcode-input');
+    const scanBtn = document.getElementById('scan-btn');
+    const cartItems = document.getElementById('cart-items');
+    const subtotalEl = document.getElementById('subtotal');
+    const taxEl = document.getElementById('tax');
+    const totalEl = document.getElementById('total');
+    const checkoutBtn = document.getElementById('checkout-btn');
+    const productSearch = document.getElementById('product-search');
+    const productList = document.getElementById('product-list');
+    const newSaleBtn = document.getElementById('new-sale-btn');
+    const printReceiptBtn = document.getElementById('print-receipt-btn');
+
+    // Cart state
+    let cart = [];
+
+    // Event Listeners
+    scanBtn.addEventListener('click', function() {
+        const barcode = barcodeInput.value.trim();
+        if (barcode) {
+            addToCart(barcode);
+        }
+    });
+
+    barcodeInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const barcode = barcodeInput.value.trim();
+            if (barcode) {
+                addToCart(barcode);
+            }
+        }
+    });
+
+    checkoutBtn.addEventListener('click', function() {
+        if (cart.length === 0) {
+            alert('Your cart is empty!');
+            return;
+        }
+
+        fetch('/api/checkout_simple', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cart: cart })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Checkout successful!');
+                cart = [];
+                updateCartDisplay();
+            } else {
+                alert('Checkout failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Checkout failed. Please try again.');
+        });
+    });
+
+    // Functions
+    function addToCart(barcode) {
+        fetch('/api/add_to_cart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ barcode: barcode })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                cart = data.cart;
+                updateCartDisplay();
+                barcodeInput.value = '';
+                barcodeInput.focus();
+            } else {
+                alert(data.error || 'Failed to add item to cart.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to add item. Please try again.');
+        });
+    }
+
+    function updateCartDisplay() {
+        cartItems.innerHTML = '';
+        let subtotal = 0;
+
+        cart.forEach((item, index) => {
+            const row = document.createElement('tr');
+            const itemTotal = parseFloat(item.price) * parseFloat(item.quantity);
+            subtotal += itemTotal;
+
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>KSh ${parseFloat(item.price).toFixed(2)}</td>
+                <td>
+                    <input type="number"
+                           class="form-control form-control-sm qty-input"
+                           step="0.01"
+                           min="0.01"
+                           value="${parseFloat(item.quantity).toFixed(2)}"
+                           data-index="${index}"
+                           onchange="updateQuantity(${index}, this.value)">
+                </td>
+                <td>KSh ${itemTotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger remove-item" data-index="${index}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            cartItems.appendChild(row);
+        });
+
+        // Update remove buttons
+        document.querySelectorAll('.remove-item').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                removeItem(index);
+            });
+        });
+
+        // Calculate tax and total
+        const taxRate = 0.16;
+        const tax = subtotal * taxRate;
+        const total = subtotal + tax;
+
+        subtotalEl.textContent = `KSh ${subtotal.toFixed(2)}`;
+        taxEl.textContent = `KSh ${tax.toFixed(2)}`;
+        totalEl.textContent = `KSh ${total.toFixed(2)}`;
+    }
+
+    // Update quantity function
+    window.updateQuantity = function(index, newQuantity) {
+        const quantity = parseFloat(newQuantity);
+
+        if (isNaN(quantity) || quantity <= 0) {
+            alert('Please enter a valid quantity (greater than 0).');
+            updateCartDisplay(); // Reset the display
+            return;
+        }
+
+        // Update the cart locally
+        cart[index].quantity = quantity;
+
+        // Send update to server
+        fetch('/api/update_quantity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                itemId: cart[index].id,
+                quantity: quantity
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                cart = data.cart; // Update cart with server response
+                updateCartDisplay();
+            } else {
+                alert(data.error || 'Failed to update quantity.');
+                updateCartDisplay(); // Reset to previous state
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update quantity. Please try again.');
+            updateCartDisplay(); // Reset to previous state
+        });
+    };
+
+    // Remove item function
+    function removeItem(index) {
+        const itemId = cart[index].id;
+
+        fetch('/api/remove_from_cart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId: itemId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                cart = data.cart;
+                updateCartDisplay();
+            } else {
+                alert(data.error || 'Failed to remove item.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to remove item. Please try again.');
+        });
+    }
+
+    // Initialize
+    updateCartDisplay();
+});
+</script>
 <style>
 .viewport {
     position: relative;
@@ -141,17 +337,14 @@
     border: 1px solid #dee2e6;
     border-radius: 0.25rem;
 }
-
 .viewport canvas, .viewport video {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
-
 #scanner-container {
     position: relative;
 }
-
 .scanner-overlay {
     position: absolute;
     top: 0;
@@ -161,7 +354,6 @@
     pointer-events: none;
     z-index: 10;
 }
-
 .scanner-line {
     position: absolute;
     width: 100%;
@@ -170,36 +362,32 @@
     box-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
     animation: scan 2s infinite linear;
 }
-
 @keyframes scan {
     0% { top: 0; }
     100% { top: 100%; }
 }
-
 /* Debug canvas styling */
 canvas.drawing, canvas.drawingBuffer {
     position: absolute;
     left: 0;
     top: 0;
 }
-
 /* Product search results */
 #product-list {
     max-height: 200px;
     overflow-y: auto;
 }
-
 /* Cart table styling */
 #cart-table tbody tr:hover {
     background-color: rgba(0, 0, 0, 0.05);
 }
-
 .qty-input {
     width: 70px;
+    text-align: center;
 }
-
 .remove-item {
     padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
 }
 </style>
 {% endblock %}
