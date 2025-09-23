@@ -58,7 +58,7 @@
                             </a>
                         </li>
                         {% endif %}
-                        {% if session['role'] in ['manager', 'cashier'] %}
+                        {% if session['role'] in ['manager', 'cashier','admin'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'list_expenses' %}active{% endif %}" href="{{ url_for('list_expenses') }}">
                                 <i class="fas fa-receipt"></i> Expenses
