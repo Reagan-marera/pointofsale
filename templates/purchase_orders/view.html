@@ -1,0 +1,49 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}View Purchase Order{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Purchase Order Details</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('manage_purchase_orders') }}" class="btn btn-sm btn-outline-secondary">Back to List</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <strong>Order Number:</strong> {{ order.order_number }}
+    </div>
+    <div class="card-body">
+        <p><strong>Supplier:</strong> {{ order.supplier.name }}</p>
+        <p><strong>Order Date:</strong> {{ order.order_date.strftime('%Y-%m-%d') }}</p>
+        <p><strong>Status:</strong> {{ order.status.capitalize() }}</p>
+        <p><strong>Total Amount:</strong> {{ "%.2f"|format(order.total_amount) }}</p>
+        <p><strong>Ordered By:</strong> {{ order.user.username }}</p>
+
+        <hr>
+
+        <h4>Order Items</h4>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Product Name</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ "%.2f"|format(item.unit_price) }}</td>
+                    <td>{{ "%.2f"|format(item.total_price) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
