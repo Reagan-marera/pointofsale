@@ -32,8 +32,13 @@
                         </li>
                         {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'products' %}active{% endif %}" href="{{ url_for('products') }}">
-                                <i class="fas fa-boxes"></i> Purchases
+                            <a class="nav-link {% if 'products' in request.endpoint %}active{% endif %}" href="{{ url_for('products') }}">
+                                <i class="fas fa-boxes"></i> Products
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'purchase_orders' in request.endpoint %}active{% endif %}" href="{{ url_for('manage_purchase_orders') }}">
+                                <i class="fas fa-file-invoice"></i> Purchase Orders
                             </a>
                         </li>
                         {% endif %}
