@@ -264,3 +264,27 @@ class OTP(db.Model):
 
     def __repr__(self):
         return f'<OTP {self.email}>'
+
+class SupplierQuotation(db.Model):
+    __tablename__ = 'supplier_quotations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
+    quotation_date = db.Column(db.DateTime, default=datetime.utcnow)
+    total_amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), default='pending') # pending, awarded, declined
+
+    supplier = db.relationship('Supplier', backref='quotations')
+    items = db.relationship('SupplierQuotationItem', backref='quotation', cascade='all, delete-orphan')
+
+class SupplierQuotationItem(db.Model):
+    __tablename__ = 'supplier_quotation_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_id = db.Column(db.Integer, db.ForeignKey('supplier_quotations.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Float, nullable=False)
+    total_price = db.Column(db.Float, nullable=False)
+
+    product = db.relationship('Product', backref='quotation_items')

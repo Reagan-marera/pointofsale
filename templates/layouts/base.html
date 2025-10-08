@@ -50,6 +50,11 @@
                                 <i class="fas fa-truck"></i> Suppliers
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'supplier_quotations' in request.endpoint %}active{% endif %}" href="{{ url_for('supplier_quotations') }}">
+                                <i class="fas fa-file-invoice-dollar"></i> Supplier Quotations
+                            </a>
+                        </li>
                         {% endif %}
                         {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">

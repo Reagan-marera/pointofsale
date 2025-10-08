@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP
+from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem
 from datetime import datetime,timedelta
 import random
 from sqlalchemy.orm import joinedload
@@ -1645,6 +1645,93 @@ def add_to_cart_simple():
 
     return jsonify({'success': True, 'cart': cart})
 
+@app.route('/supplier_quotations')
+@login_required(roles=['manager', 'admin'])
+def supplier_quotations():
+    quotations = SupplierQuotation.query.options(joinedload(SupplierQuotation.supplier)).order_by(SupplierQuotation.quotation_date.desc()).all()
+    return render_template('supplier_quotations/list.html', quotations=quotations)
+
+@app.route('/supplier_quotations/add', methods=['GET', 'POST'])
+@login_required(roles=['manager', 'admin'])
+def add_supplier_quotation():
+    suppliers = Supplier.query.all()
+    products = Product.query.all()
+
+    if request.method == 'POST':
+        supplier_id = request.form.get('supplier_id')
+        items = []
+        total_amount = 0
+
+        for key, value in request.form.items():
+            if key.startswith('product_'):
+                index = key.split('_')[1]
+                product_id = value
+                quantity = int(request.form[f'quantity_{index}'])
+                unit_price = float(request.form[f'unit_price_{index}'])
+                total_price = quantity * unit_price
+                total_amount += total_price
+                items.append({
+                    'product_id': product_id,
+                    'quantity': quantity,
+                    'unit_price': unit_price,
+                    'total_price': total_price
+                })
+
+        if not supplier_id or not items:
+            flash('Please select a supplier and add at least one item.', 'danger')
+            return redirect(url_for('add_supplier_quotation'))
+
+        quotation = SupplierQuotation(
+            supplier_id=supplier_id,
+            total_amount=total_amount,
+            status='pending'
+        )
+        db.session.add(quotation)
+        db.session.commit()
+
+        for item in items:
+            quotation_item = SupplierQuotationItem(
+                quotation_id=quotation.id,
+                product_id=item['product_id'],
+                quantity=item['quantity'],
+                unit_price=item['unit_price'],
+                total_price=item['total_price']
+            )
+            db.session.add(quotation_item)
+
+        db.session.commit()
+        flash('Supplier quotation added successfully!', 'success')
+        return redirect(url_for('supplier_quotations'))
+
+    return render_template('supplier_quotations/add.html', suppliers=suppliers, products=products)
+
+@app.route('/supplier_quotations/<int:quotation_id>')
+@login_required(roles=['manager', 'admin'])
+def view_supplier_quotation(quotation_id):
+    quotation = SupplierQuotation.query.get_or_404(quotation_id)
+    return render_template('supplier_quotations/view.html', quotation=quotation)
+
+@app.route('/supplier_quotations/<int:quotation_id>/award', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def award_supplier_quotation(quotation_id):
+    quotation = SupplierQuotation.query.get_or_404(quotation_id)
+
+    # Decline all other quotations for the same products
+    product_ids = [item.product_id for item in quotation.items]
+    other_quotations = SupplierQuotation.query.filter(
+        SupplierQuotation.id != quotation_id,
+        SupplierQuotation.items.any(SupplierQuotationItem.product_id.in_(product_ids))
+    ).all()
+
+    for other_quotation in other_quotations:
+        other_quotation.status = 'declined'
+
+    # Award the selected quotation
+    quotation.status = 'awarded'
+    db.session.commit()
+
+    flash(f'Quotation from {quotation.supplier.name} has been awarded.', 'success')
+    return redirect(url_for('supplier_quotations'))
 
 if __name__ == '__main__':
     app.run(debug=True)

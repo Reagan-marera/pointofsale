@@ -1,0 +1,61 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}View Supplier Quotation{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Quotation Details</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('supplier_quotations') }}" class="btn btn-sm btn-outline-secondary">Back to List</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        Quotation from <strong>{{ quotation.supplier.name }}</strong>
+    </div>
+    <div class="card-body">
+        <p><strong>Date:</strong> {{ quotation.quotation_date.strftime('%Y-%m-%d') }}</p>
+        <p><strong>Total Amount:</strong> {{ "%.2f"|format(quotation.total_amount) }}</p>
+        <p><strong>Status:</strong>
+            <span class="badge
+                {% if quotation.status == 'pending' %}bg-warning
+                {% elif quotation.status == 'awarded' %}bg-success
+                {% elif quotation.status == 'declined' %}bg-danger
+                {% endif %}">
+                {{ quotation.status.capitalize() }}
+            </span>
+        </p>
+
+        <hr>
+
+        <h4>Quotation Items</h4>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in quotation.items %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ "%.2f"|format(item.unit_price) }}</td>
+                    <td>{{ "%.2f"|format(item.total_price) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if quotation.status == 'pending' %}
+        <form action="{{ url_for('award_supplier_quotation', quotation_id=quotation.id) }}" method="POST" class="mt-3">
+            <button type="submit" class="btn btn-success">Award this Quotation</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
