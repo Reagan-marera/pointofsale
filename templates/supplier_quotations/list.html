@@ -1,0 +1,52 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Supplier Quotations{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Supplier Quotations</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_supplier_quotation') }}" class="btn btn-sm btn-outline-secondary">Add Quotation</a>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-sm">
+        <thead>
+            <tr>
+                <th>Supplier</th>
+                <th>Date</th>
+                <th>Total Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for quotation in quotations %}
+            <tr>
+                <td>{{ quotation.supplier.name }}</td>
+                <td>{{ quotation.quotation_date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ "%.2f"|format(quotation.total_amount) }}</td>
+                <td>
+                    <span class="badge
+                        {% if quotation.status == 'pending' %}bg-warning
+                        {% elif quotation.status == 'awarded' %}bg-success
+                        {% elif quotation.status == 'declined' %}bg-danger
+                        {% endif %}">
+                        {{ quotation.status.capitalize() }}
+                    </span>
+                </td>
+                <td>
+                    <a href="{{ url_for('view_supplier_quotation', quotation_id=quotation.id) }}" class="btn btn-sm btn-info">View</a>
+                    {% if quotation.status == 'pending' %}
+                    <form action="{{ url_for('award_supplier_quotation', quotation_id=quotation.id) }}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-sm btn-success">Award</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
