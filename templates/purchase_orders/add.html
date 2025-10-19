@@ -27,8 +27,8 @@
                 <label for="product_0" class="form-label">Product</label>
                 <select class="form-control" id="product_0" name="product_0" required>
                     <option value="">Select a product</option>
-                    {% for product in products %}
-                    <option value="{{ product.id }}">{{ product.name }} (Stock: {{ product.current_stock }})</option>
+                    {% for item in items %}
+                    <option value="{{ item.id }}">{{ item.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -66,8 +66,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <label for="product_${itemIndex}" class="form-label">Product</label>
                 <select class="form-control" id="product_${itemIndex}" name="product_${itemIndex}" required>
                     <option value="">Select a product</option>
-                    {% for product in products %}
-                    <option value="{{ product.id }}">{{ product.name }} (Stock: {{ product.current_stock }})</option>
+                    {% for item in items %}
+                    <option value="{{ item.id }}">{{ item.name }}</option>
                     {% endfor %}
                 </select>
             </div>
