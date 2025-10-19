@@ -32,9 +32,13 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="quantity_0" class="form-label">Quantity</label>
                 <input type="number" class="form-control" id="quantity_0" name="quantity_0" min="1" value="1" required>
+            </div>
+            <div class="col-md-3">
+                <label for="unit_price_0" class="form-label">Unit Price</label>
+                <input type="number" step="0.01" class="form-control" id="unit_price_0" name="unit_price_0" min="0" required>
             </div>
             <div class="col-md-2 d-flex align-items-end">
                 <button type="button" class="btn btn-danger remove-item-btn">Remove</button>
@@ -71,9 +75,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="quantity_${itemIndex}" class="form-label">Quantity</label>
                 <input type="number" class="form-control" id="quantity_${itemIndex}" name="quantity_${itemIndex}" min="1" value="1" required>
+            </div>
+            <div class="col-md-3">
+                <label for="unit_price_${itemIndex}" class="form-label">Unit Price</label>
+                <input type="number" step="0.01" class="form-control" id="unit_price_${itemIndex}" name="unit_price_${itemIndex}" min="0" required>
             </div>
             <div class="col-md-2 d-flex align-items-end">
                 <button type="button" class="btn btn-danger remove-item-btn">Remove</button>
