@@ -921,17 +921,16 @@ def add_purchase_order():
         while f'product_{i}' in request.form:
             item_id = request.form.get(f'product_{i}')
             quantity = int(request.form.get(f'quantity_{i}', 0))
+            unit_price = float(request.form.get(f'unit_price_{i}', 0))
 
             if item_id and quantity > 0:
                 item = Item.query.get(item_id)
                 if item:
-                    product = Product.query.filter_by(name=item.name).first()
-                    buying_price = product.buying_price if product else 0
-                    total_price = buying_price * quantity
+                    total_price = unit_price * quantity
                     items_data.append({
                         'item_id': item.id,
                         'quantity': quantity,
-                        'unit_price': buying_price,
+                        'unit_price': unit_price,
                         'total_price': total_price
                     })
                     total_order_amount += total_price
@@ -1879,10 +1878,10 @@ def award_supplier_quotation(quotation_id):
     quotation = SupplierQuotation.query.get_or_404(quotation_id)
 
     # Decline all other quotations for the same products
-    product_ids = [item.product_id for item in quotation.items]
+    item_ids = [item.item_id for item in quotation.items]
     other_quotations = SupplierQuotation.query.filter(
         SupplierQuotation.id != quotation_id,
-        SupplierQuotation.items.any(SupplierQuotationItem.product_id.in_(product_ids))
+        SupplierQuotation.items.any(SupplierQuotationItem.item_id.in_(item_ids))
     ).all()
 
     for other_quotation in other_quotations:
