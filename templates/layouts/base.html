@@ -26,6 +26,16 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if 'items' in request.endpoint %}active{% endif %}" href="{{ url_for('manage_items') }}">
+                                <i class="fas fa-tags"></i> Items
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'categories' in request.endpoint %}active{% endif %}" href="{{ url_for('manage_categories') }}">
+                                <i class="fas fa-sitemap"></i> Categories
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'pos' %}active{% endif %}" href="{{ url_for('pos') }}">
                                 <i class="fas fa-cash-register"></i> Sales
                             </a>

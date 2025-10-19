@@ -1,0 +1,41 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Resolve Products{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Resolve Missing Products</h1>
+    </div>
+
+    <div class="alert alert-warning" role="alert">
+        The following items from Purchase Order #{{ order_id }} do not exist as products. Please create them before receiving the order.
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Item Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in missing_products %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>
+                        <a href="{{ url_for('add_product', name=item.name, redirect_url=url_for('resolve_products', order_id=order_id)) }}" class="btn btn-sm btn-primary">
+                            Create Product
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <form method="POST" action="{{ url_for('receive_purchase_order', order_id=order_id) }}">
+        <button type="submit" class="btn btn-success">Continue Receiving</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem
+from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category
 from datetime import datetime,timedelta
 import random
 from sqlalchemy.orm import joinedload
@@ -326,6 +326,8 @@ def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     suppliers = Supplier.query.all()
     dealers = Dealer.query.all()
+    items = Item.query.all()
+    categories = Category.query.all()
 
     if request.method == 'POST':
         product.name = request.form['name']
@@ -347,8 +349,55 @@ def edit_product(product_id):
         flash('Product updated successfully!', 'success')
         return redirect(url_for('products'))
 
-    return render_template('edit_product.html', product=product, suppliers=suppliers, dealers=dealers)
+    return render_template('edit_product.html', product=product, suppliers=suppliers, dealers=dealers, items=items, categories=categories)
 
+@app.route('/items', methods=['GET', 'POST'])
+@login_required(roles=['manager', 'admin'])
+def manage_items():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        if name:
+            new_item = Item(name=name)
+            db.session.add(new_item)
+            db.session.commit()
+            flash('Item added successfully!', 'success')
+        return redirect(url_for('manage_items'))
+
+    items = Item.query.all()
+    return render_template('items.html', items=items)
+
+@app.route('/items/delete/<int:item_id>', methods=['POST'])
+@login_required(roles=['admin'])
+def delete_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    db.session.delete(item)
+    db.session.commit()
+    flash('Item deleted successfully!', 'success')
+    return redirect(url_for('manage_items'))
+
+@app.route('/categories', methods=['GET', 'POST'])
+@login_required(roles=['admin'])
+def manage_categories():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        if name:
+            new_category = Category(name=name)
+            db.session.add(new_category)
+            db.session.commit()
+            flash('Category added successfully!', 'success')
+        return redirect(url_for('manage_categories'))
+
+    categories = Category.query.all()
+    return render_template('categories.html', categories=categories)
+
+@app.route('/categories/delete/<int:category_id>', methods=['POST'])
+@login_required(roles=['admin'])
+def delete_category(category_id):
+    category = Category.query.get_or_404(category_id)
+    db.session.delete(category)
+    db.session.commit()
+    flash('Category deleted successfully!', 'success')
+    return redirect(url_for('manage_categories'))
 @app.route('/admin/users')
 @login_required(roles=['admin'])
 def manage_users():
@@ -649,6 +698,8 @@ def toggle_user_status(user_id):
 def add_product():
     suppliers = Supplier.query.all()
     dealers = Dealer.query.all()  # Fetch all dealers
+    items = Item.query.all()
+    categories = Category.query.all()
 
     if request.method == 'POST':
         name = request.form['name']
@@ -660,6 +711,7 @@ def add_product():
         supplier_id = request.form['supplier_id']
         dealer_id = request.form['dealer_id']  # Get dealer_id from form
         vatable = 'vatable' in request.form
+        redirect_url = request.form.get('redirect_url')
 
         if not barcode:
             flash('Barcode is required.', 'danger')
@@ -690,9 +742,13 @@ def add_product():
         db.session.commit()
 
         flash('Product added successfully!', 'success')
+        if redirect_url:
+            return redirect(redirect_url)
         return redirect(url_for('products'))
 
-    return render_template('add_product.html', suppliers=suppliers, dealers=dealers)
+    name = request.args.get('name')
+    redirect_url = request.args.get('redirect_url')
+    return render_template('add_product.html', suppliers=suppliers, dealers=dealers, items=items, categories=categories, name=name, redirect_url=redirect_url)
 
 
 @app.route('/pos')
@@ -853,6 +909,7 @@ def view_purchase_order(order_id):
 def add_purchase_order():
     suppliers = Supplier.query.all()
     products = Product.query.all()
+    items = Item.query.all()
 
     if request.method == 'POST':
         supplier_id = request.form.get('supplier_id')
@@ -862,17 +919,19 @@ def add_purchase_order():
         # Loop through form items to collect products
         i = 0
         while f'product_{i}' in request.form:
-            product_id = request.form.get(f'product_{i}')
+            item_id = request.form.get(f'product_{i}')
             quantity = int(request.form.get(f'quantity_{i}', 0))
 
-            if product_id and quantity > 0:
-                product = Product.query.get(product_id)
-                if product:
-                    total_price = product.buying_price * quantity
+            if item_id and quantity > 0:
+                item = Item.query.get(item_id)
+                if item:
+                    product = Product.query.filter_by(name=item.name).first()
+                    buying_price = product.buying_price if product else 0
+                    total_price = buying_price * quantity
                     items_data.append({
-                        'product_id': product.id,
+                        'item_id': item.id,
                         'quantity': quantity,
-                        'unit_price': product.buying_price,
+                        'unit_price': buying_price,
                         'total_price': total_price
                     })
                     total_order_amount += total_price
@@ -897,7 +956,10 @@ def add_purchase_order():
         for item_data in items_data:
             order_item = PurchaseOrderItem(
                 purchase_order_id=new_order.id,
-                **item_data
+                item_id=item_data['item_id'],
+                quantity=item_data['quantity'],
+                unit_price=item_data['unit_price'],
+                total_price=item_data['total_price']
             )
             db.session.add(order_item)
 
@@ -905,16 +967,24 @@ def add_purchase_order():
         flash('Purchase order created successfully!', 'success')
         return redirect(url_for('manage_purchase_orders'))
 
-    return render_template('purchase_orders/add.html', suppliers=suppliers, products=products)
+    return render_template('purchase_orders/add.html', suppliers=suppliers, products=products, items=items)
 
 @app.route('/purchase_orders/<int:order_id>/receive', methods=['POST'])
 @login_required(roles=['manager'])
 def receive_purchase_order(order_id):
     purchase_order = PurchaseOrder.query.get_or_404(order_id)
+    missing_products = []
+    for item in purchase_order.items:
+        product = Product.query.filter_by(name=item.item.name).first()
+        if not product:
+            missing_products.append(item.item)
+
+    if missing_products:
+        return redirect(url_for('resolve_products', order_id=order_id))
 
     total_purchase_amount = 0
     for item in purchase_order.items:
-        product = Product.query.get(item.product_id)
+        product = Product.query.filter_by(name=item.item.name).first()
         product.current_stock += item.quantity
 
         # Calculate total purchase amount for this item
@@ -939,6 +1009,17 @@ def receive_purchase_order(order_id):
 
     flash('Purchase order received successfully', 'success')
     return redirect(url_for('manage_purchase_orders'))
+
+@app.route('/resolve_products/<int:order_id>')
+@login_required(roles=['manager'])
+def resolve_products(order_id):
+    purchase_order = PurchaseOrder.query.get_or_404(order_id)
+    missing_products = []
+    for item in purchase_order.items:
+        product = Product.query.filter_by(name=item.item.name).first()
+        if not product:
+            missing_products.append(item.item)
+    return render_template('resolve_products.html', order_id=order_id, missing_products=missing_products)
 
 @app.route('/purchase_orders/<int:order_id>/finalize', methods=['POST'])
 @login_required(roles=['manager'])
@@ -1735,6 +1816,7 @@ def supplier_quotations():
 def add_supplier_quotation():
     suppliers = Supplier.query.all()
     products = Product.query.all()
+    items = Item.query.all()
 
     if request.method == 'POST':
         supplier_id = request.form.get('supplier_id')
@@ -1744,13 +1826,14 @@ def add_supplier_quotation():
         for key, value in request.form.items():
             if key.startswith('product_'):
                 index = key.split('_')[1]
-                product_id = value
+                item_id = value
                 quantity = int(request.form[f'quantity_{index}'])
                 unit_price = float(request.form[f'unit_price_{index}'])
                 total_price = quantity * unit_price
                 total_amount += total_price
+                item = Item.query.get(item_id)
                 items.append({
-                    'product_id': product_id,
+                    'item_id': item_id,
                     'quantity': quantity,
                     'unit_price': unit_price,
                     'total_price': total_price
@@ -1771,7 +1854,7 @@ def add_supplier_quotation():
         for item in items:
             quotation_item = SupplierQuotationItem(
                 quotation_id=quotation.id,
-                product_id=item['product_id'],
+                item_id=item['item_id'],
                 quantity=item['quantity'],
                 unit_price=item['unit_price'],
                 total_price=item['total_price']
@@ -1782,7 +1865,7 @@ def add_supplier_quotation():
         flash('Supplier quotation added successfully!', 'success')
         return redirect(url_for('supplier_quotations'))
 
-    return render_template('supplier_quotations/add.html', suppliers=suppliers, products=products)
+    return render_template('supplier_quotations/add.html', suppliers=suppliers, products=products, items=items)
 
 @app.route('/supplier_quotations/<int:quotation_id>')
 @login_required(roles=['manager', 'admin'])
