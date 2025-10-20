@@ -848,6 +848,132 @@ def view_purchase_order(order_id):
     ).get_or_404(order_id)
     return render_template('purchase_orders/view.html', order=order)
 
+@app.route('/purchase_orders/edit/<int:order_id>', methods=['GET', 'POST'])
+@login_required(roles=['manager', 'admin'])
+def edit_purchase_order(order_id):
+    order = PurchaseOrder.query.get_or_404(order_id)
+    suppliers = Supplier.query.all()
+    items = Item.query.all()
+    if request.method == 'POST':
+        order.supplier_id = request.form.get('supplier_id')
+        total_order_amount = 0
+
+        # Clear existing items
+        for item in order.items:
+            db.session.delete(item)
+
+        items_data = []
+        i = 0
+        while f'product_{i}' in request.form:
+            item_id = request.form.get(f'product_{i}')
+            quantity = int(request.form.get(f'quantity_{i}', 0))
+            unit_price = float(request.form.get(f'unit_price_{i}', 0))
+
+            if item_id and quantity > 0:
+                item = Item.query.get(item_id)
+                if item:
+                    total_price = unit_price * quantity
+                    items_data.append({
+                        'item_id': item.id,
+                        'quantity': quantity,
+                        'unit_price': unit_price,
+                        'total_price': total_price
+                    })
+                    total_order_amount += total_price
+            i += 1
+
+        order.total_amount = total_order_amount
+
+        for item_data in items_data:
+            order_item = PurchaseOrderItem(
+                purchase_order_id=order.id,
+                item_id=item_data['item_id'],
+                quantity=item_data['quantity'],
+                unit_price=item_data['unit_price'],
+                total_price=item_data['total_price']
+            )
+            db.session.add(order_item)
+
+        db.session.commit()
+        flash('Purchase order updated successfully!', 'success')
+        return redirect(url_for('manage_purchase_orders'))
+
+    return render_template('purchase_orders/edit.html', order=order, suppliers=suppliers, items=items)
+
+@app.route('/purchase_orders/delete/<int:order_id>', methods=['POST'])
+@login_required(roles=['admin'])
+def delete_purchase_order(order_id):
+    order = PurchaseOrder.query.get_or_404(order_id)
+    for item in order.items:
+        db.session.delete(item)
+    db.session.delete(order)
+    db.session.commit()
+    flash('Purchase order deleted successfully!', 'success')
+    return redirect(url_for('manage_purchase_orders'))
+
+@app.route('/purchase_orders/edit/<int:order_id>', methods=['GET', 'POST'])
+@login_required(roles=['manager', 'admin'])
+def edit_purchase_order(order_id):
+    order = PurchaseOrder.query.get_or_404(order_id)
+    suppliers = Supplier.query.all()
+    items = Item.query.all()
+    if request.method == 'POST':
+        order.supplier_id = request.form.get('supplier_id')
+        total_order_amount = 0
+
+        # Clear existing items
+        for item in order.items:
+            db.session.delete(item)
+
+        items_data = []
+        i = 0
+        while f'product_{i}' in request.form:
+            item_id = request.form.get(f'product_{i}')
+            quantity = int(request.form.get(f'quantity_{i}', 0))
+            unit_price = float(request.form.get(f'unit_price_{i}', 0))
+
+            if item_id and quantity > 0:
+                item = Item.query.get(item_id)
+                if item:
+                    total_price = unit_price * quantity
+                    items_data.append({
+                        'item_id': item.id,
+                        'quantity': quantity,
+                        'unit_price': unit_price,
+                        'total_price': total_price
+                    })
+                    total_order_amount += total_price
+            i += 1
+
+        order.total_amount = total_order_amount
+
+        for item_data in items_data:
+            order_item = PurchaseOrderItem(
+                purchase_order_id=order.id,
+                item_id=item_data['item_id'],
+                quantity=item_data['quantity'],
+                unit_price=item_data['unit_price'],
+                total_price=item_data['total_price']
+            )
+            db.session.add(order_item)
+
+        db.session.commit()
+        flash('Purchase order updated successfully!', 'success')
+        return redirect(url_for('manage_purchase_orders'))
+
+    return render_template('purchase_orders/edit.html', order=order, suppliers=suppliers, items=items)
+
+@app.route('/purchase_orders/delete/<int:order_id>', methods=['POST'])
+@login_required(roles=['admin'])
+def delete_purchase_order(order_id):
+    order = PurchaseOrder.query.get_or_404(order_id)
+    for item in order.items:
+        db.session.delete(item)
+    db.session.delete(order)
+    db.session.commit()
+    flash('Purchase order deleted successfully!', 'success')
+    return redirect(url_for('manage_purchase_orders'))
+
 @app.route('/purchase_orders/add', methods=['GET', 'POST'])
 @login_required(roles=['manager', 'admin'])
 def add_purchase_order():
@@ -1729,6 +1855,69 @@ def add_to_cart_simple():
 def supplier_quotations():
     quotations = SupplierQuotation.query.options(joinedload(SupplierQuotation.supplier)).order_by(SupplierQuotation.quotation_date.desc()).all()
     return render_template('supplier_quotations/list.html', quotations=quotations)
+
+@app.route('/supplier_quotations/edit/<int:quotation_id>', methods=['GET', 'POST'])
+@login_required(roles=['manager', 'admin'])
+def edit_supplier_quotation(quotation_id):
+    quotation = SupplierQuotation.query.get_or_404(quotation_id)
+    suppliers = Supplier.query.all()
+    items = Item.query.all()
+    if request.method == 'POST':
+        quotation.supplier_id = request.form.get('supplier_id')
+        total_quotation_amount = 0
+
+        # Clear existing items
+        for item in quotation.items:
+            db.session.delete(item)
+
+        items_data = []
+        i = 0
+        while f'product_{i}' in request.form:
+            item_id = request.form.get(f'product_{i}')
+            quantity = int(request.form.get(f'quantity_{i}', 0))
+            unit_price = float(request.form.get(f'unit_price_{i}', 0))
+
+            if item_id and quantity > 0:
+                item = Item.query.get(item_id)
+                if item:
+                    total_price = unit_price * quantity
+                    items_data.append({
+                        'item_id': item.id,
+                        'quantity': quantity,
+                        'unit_price': unit_price,
+                        'total_price': total_price
+                    })
+                    total_quotation_amount += total_price
+            i += 1
+
+        quotation.total_amount = total_quotation_amount
+
+        for item_data in items_data:
+            quotation_item = SupplierQuotationItem(
+                quotation_id=quotation.id,
+                item_id=item_data['item_id'],
+                quantity=item_data['quantity'],
+                unit_price=item_data['unit_price'],
+                total_price=item_data['total_price']
+            )
+            db.session.add(quotation_item)
+
+        db.session.commit()
+        flash('Supplier quotation updated successfully!', 'success')
+        return redirect(url_for('manage_supplier_quotations'))
+
+    return render_template('supplier_quotations/edit.html', quotation=quotation, suppliers=suppliers, items=items)
+
+@app.route('/supplier_quotations/delete/<int:quotation_id>', methods=['POST'])
+@login_required(roles=['admin'])
+def delete_supplier_quotation(quotation_id):
+    quotation = SupplierQuotation.query.get_or_404(quotation_id)
+    for item in quotation.items:
+        db.session.delete(item)
+    db.session.delete(quotation)
+    db.session.commit()
+    flash('Supplier quotation deleted successfully!', 'success')
+    return redirect(url_for('manage_supplier_quotations'))
 
 @app.route('/supplier_quotations/add', methods=['GET', 'POST'])
 @login_required(roles=['manager', 'admin'])
