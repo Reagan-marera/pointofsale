@@ -900,61 +900,11 @@ def manage_purchase_orders():
 def view_purchase_order(order_id):
     order = PurchaseOrder.query.options(
         joinedload(PurchaseOrder.supplier),
-        joinedload(PurchaseOrder.items).joinedload(PurchaseOrderItem.product)
+        joinedload(PurchaseOrder.items).joinedload(PurchaseOrderItem.item)
+
     ).get_or_404(order_id)
     return render_template('purchase_orders/view.html', order=order)
 
-@app.route('/purchase_orders/edit/<int:order_id>', methods=['GET', 'POST'])
-@login_required(roles=['manager', 'admin'])
-def edit_purchase_order(order_id):
-    order = PurchaseOrder.query.get_or_404(order_id)
-    suppliers = Supplier.query.all()
-    items = Item.query.all()
-    if request.method == 'POST':
-        order.supplier_id = request.form.get('supplier_id')
-        total_order_amount = 0
-
-        # Clear existing items
-        for item in order.items:
-            db.session.delete(item)
-
-        items_data = []
-        i = 0
-        while f'product_{i}' in request.form:
-            item_id = request.form.get(f'product_{i}')
-            quantity = int(request.form.get(f'quantity_{i}', 0))
-            unit_price = float(request.form.get(f'unit_price_{i}', 0))
-
-            if item_id and quantity > 0:
-                item = Item.query.get(item_id)
-                if item:
-                    total_price = unit_price * quantity
-                    items_data.append({
-                        'item_id': item.id,
-                        'quantity': quantity,
-                        'unit_price': unit_price,
-                        'total_price': total_price
-                    })
-                    total_order_amount += total_price
-            i += 1
-
-        order.total_amount = total_order_amount
-
-        for item_data in items_data:
-            order_item = PurchaseOrderItem(
-                purchase_order_id=order.id,
-                item_id=item_data['item_id'],
-                quantity=item_data['quantity'],
-                unit_price=item_data['unit_price'],
-                total_price=item_data['total_price']
-            )
-            db.session.add(order_item)
-
-        db.session.commit()
-        flash('Purchase order updated successfully!', 'success')
-        return redirect(url_for('manage_purchase_orders'))
-
-    return render_template('purchase_orders/edit.html', order=order, suppliers=suppliers, items=items)
 
 @app.route('/purchase_orders/delete/<int:order_id>', methods=['POST'])
 @login_required(roles=['admin'])
@@ -1019,16 +969,6 @@ def edit_purchase_order(order_id):
 
     return render_template('purchase_orders/edit.html', order=order, suppliers=suppliers, items=items)
 
-@app.route('/purchase_orders/delete/<int:order_id>', methods=['POST'])
-@login_required(roles=['admin'])
-def delete_purchase_order(order_id):
-    order = PurchaseOrder.query.get_or_404(order_id)
-    for item in order.items:
-        db.session.delete(item)
-    db.session.delete(order)
-    db.session.commit()
-    flash('Purchase order deleted successfully!', 'success')
-    return redirect(url_for('manage_purchase_orders'))
 
 @app.route('/purchase_orders/add', methods=['GET', 'POST'])
 @login_required(roles=['manager', 'admin'])
@@ -1095,45 +1035,46 @@ def add_purchase_order():
     return render_template('purchase_orders/add.html', suppliers=suppliers, products=products, items=items)
 
 @app.route('/purchase_orders/<int:order_id>/receive', methods=['POST'])
-@login_required(roles=['manager'])
+@login_required(roles=['manager', 'admin'])
 def receive_purchase_order(order_id):
     purchase_order = PurchaseOrder.query.get_or_404(order_id)
-    missing_products = []
-    for item in purchase_order.items:
-        product = Product.query.filter_by(name=item.item.name).first()
-        if not product:
-            missing_products.append(item.item)
-
-    if missing_products:
-        return redirect(url_for('resolve_products', order_id=order_id))
+    if purchase_order.status != 'pending':
+        flash('Only pending orders can be received.', 'danger')
+        return redirect(url_for('manage_purchase_orders'))
 
     total_purchase_amount = 0
     for item in purchase_order.items:
         product = Product.query.filter_by(name=item.item.name).first()
-        product.current_stock += item.quantity
+        if not product:
+            flash(f'Product {item.item.name} not found in inventory.', 'danger')
+            return redirect(url_for('view_purchase_order', order_id=order_id))
 
+        # Update product stock
+        product.current_stock += item.quantity
         # Calculate total purchase amount for this item
-        item_total = product.buying_price * item.quantity
+        item_total = item.unit_price * item.quantity
         total_purchase_amount += item_total
 
-        # Record inventory movement with the total purchase amount
+        # Record inventory movement
         movement = InventoryMovement(
             product_id=product.id,
             movement_type='purchase',
             quantity=item.quantity,
-            unit_price=product.buying_price,
+            unit_price=item.unit_price,
             total_amount=item_total,
             reference_id=purchase_order.id,
-            notes='Received from purchase order'
+            notes=f'Received from PO {purchase_order.order_number}'
         )
         db.session.add(movement)
 
-    # Update the total purchase amount for the purchase order
+    # Update purchase order status and total amount
+    purchase_order.status = 'received'
     purchase_order.total_amount = total_purchase_amount
     db.session.commit()
 
-    flash('Purchase order received successfully', 'success')
+    flash('Purchase order received and stock updated successfully!', 'success')
     return redirect(url_for('manage_purchase_orders'))
+
 
 @app.route('/resolve_products/<int:order_id>')
 @login_required(roles=['manager'])
@@ -2082,6 +2023,8 @@ def award_supplier_quotation(quotation_id):
 
     flash(f'Quotation from {quotation.supplier.name} has been awarded.', 'success')
     return redirect(url_for('supplier_quotations'))
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

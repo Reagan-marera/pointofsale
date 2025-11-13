@@ -1,7 +1,5 @@
 {% extends "layouts/base.html" %}
-
 {% block title %}Supplier Quotations{% endblock %}
-
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Supplier Quotations</h1>
@@ -9,7 +7,6 @@
         <a href="{{ url_for('add_supplier_quotation') }}" class="btn btn-sm btn-outline-secondary">Add Quotation</a>
     </div>
 </div>
-
 <div class="table-responsive">
     <table class="table table-striped table-sm">
         <thead>
@@ -38,6 +35,10 @@
                 </td>
                 <td>
                     <a href="{{ url_for('view_supplier_quotation', quotation_id=quotation.id) }}" class="btn btn-sm btn-info">View</a>
+                    <a href="{{ url_for('edit_supplier_quotation', quotation_id=quotation.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                    <form action="{{ url_for('delete_supplier_quotation', quotation_id=quotation.id) }}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this quotation?');">Delete</button>
+                    </form>
                     {% if quotation.status == 'pending' %}
                             <a href="{{ url_for('edit_supplier_quotation', quotation_id=quotation.id) }}" class="btn btn-warning btn-sm">Edit</a>
                             <form method="POST" action="{{ url_for('delete_supplier_quotation', quotation_id=quotation.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this quotation?');">
