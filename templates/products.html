@@ -11,7 +11,9 @@
                 <a href="{{ url_for('add_product') }}" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-plus-circle"></i> Add Product
                 </a>
-               
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="scan-product-btn">
+                    <i class="bi bi-upc-scan"></i> Scan Product
+                </button>
             </div>
         </div>
     </div>
@@ -207,7 +209,8 @@
         // View product button click handler
         document.getElementById('view-product-btn').addEventListener('click', function() {
             if (currentScannedProduct) {
-                window.location.href = `/products/${currentScannedProduct.id}`;
+                // Correct the URL to point to the edit page
+                window.location.href = `/products/edit/${currentScannedProduct.id}`;
             }
         });
     });
