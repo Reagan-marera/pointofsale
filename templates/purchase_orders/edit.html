@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-
+{% extends "layouts/base.html" %}
+{% block title %}Edit Purchase Order{% endblock %}
 {% block content %}
 <div class="container mt-4">
     <h2>Edit Purchase Order</h2>
@@ -26,9 +26,9 @@
                 {% for po_item in order.items %}
                 <tr class="item-row">
                     <td>
-                        <select class="form-control product-select" name="product_{{ loop.index0 }}">
+                        <select class="form-control product-select" name="product_{{ loop.index0 }}" data-index="{{ loop.index0 }}">
                             {% for item in items %}
-                                <option value="{{ item.id }}" data-price="{{ item.get_latest_price() }}" {% if item.id == po_item.item_id %}selected{% endif %}>{{ item.name }}</option>
+                                <option value="{{ item.id }}" data-price="{{ item.selling_price }}" {% if item.id == po_item.item_id %}selected{% endif %}>{{ item.name }}</option>
                             {% endfor %}
                         </select>
                     </td>
@@ -55,6 +55,7 @@
                 row.querySelector('.quantity').name = `quantity_${index}`;
                 row.querySelector('.unit-price').name = `unit_price_${index}`;
                 row.querySelector('.total-price').name = `total_price_${index}`;
+                row.querySelector('.product-select').dataset.index = index;
             });
             itemIndex = document.querySelectorAll('#items-tbody .item-row').length;
         }
@@ -65,10 +66,10 @@
             newRow.className = 'item-row';
             newRow.innerHTML = `
                 <td>
-                    <select class="form-control product-select" name="product_${itemIndex}">
+                    <select class="form-control product-select" name="product_${itemIndex}" data-index="${itemIndex}">
                         <option value="">Select a product</option>
                         {% for item in items %}
-                            <option value="{{ item.id }}" data-price="{{ item.get_latest_price() }}">{{ item.name }}</option>
+                            <option value="{{ item.id }}" data-price="{{ item.selling_price }}">{{ item.name }}</option>
                         {% endfor %}
                     </select>
                 </td>
@@ -111,6 +112,11 @@
             const totalPrice = (quantity * unitPrice).toFixed(2);
             row.querySelector('.total-price').value = totalPrice;
         }
+
+        // Initialize the total prices for existing rows
+        document.querySelectorAll('.item-row').forEach(row => {
+            updateTotalPrice(row);
+        });
 
         // Initial setup
         updateRowIndices();
