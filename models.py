@@ -52,6 +52,26 @@ class Product(db.Model):
     supplier = db.relationship('Supplier', backref=db.backref('supplier_products', lazy=True))
     dealer = db.relationship('Dealer', backref='products')
 
+    @db.validates('selling_price')
+    def validate_selling_price(self, key, selling_price):
+        if selling_price <= self.buying_price:
+            raise ValueError("Selling price must be greater than buying price.")
+        return selling_price
+
+    @db.validates('current_stock')
+    def validate_stock(self, key, current_stock):
+        if current_stock < 0:
+            raise ValueError("Stock cannot be negative.")
+        return current_stock
+
+    @db.validates('barcode')
+    def validate_barcode(self, key, barcode):
+        if not barcode:
+            raise ValueError("Barcode cannot be empty.")
+        if Product.query.filter(Product.barcode == barcode).first():
+            raise ValueError("Barcode must be unique.")
+        return barcode
+
     def update_stock(self, quantity):
         new_stock = self.current_stock + quantity
         if new_stock < 0:
@@ -113,6 +133,15 @@ class SaleItem(db.Model):
     total_price = db.Column(db.Float, nullable=False)
 
     product = db.relationship('Product', backref='sale_items')
+
+    @db.validates('quantity')
+    def validate_quantity(self, key, quantity):
+        if quantity <= 0:
+            raise ValueError("Quantity must be a positive number.")
+
+        if self.product and self.product.current_stock < quantity:
+            raise ValueError(f"Not enough stock for {self.product.name}. Only {self.product.current_stock} available.")
+        return quantity
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -19,9 +19,14 @@ migrate = Migrate(app, db)
 mail = Mail(app)
 
 
-# Create tables before first request
+# Create tables and default admin user
 with app.app_context():
     db.create_all()
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', email='admin@example.com', role='admin')
+        admin.set_password('admin')
+        db.session.add(admin)
+        db.session.commit()
 
 # Helper functions
 def generate_barcode():
@@ -344,10 +349,14 @@ def edit_product(product_id):
         if not product.name or not product.category or not product.buying_price or not product.selling_price or not product.current_stock or not product.min_stock_level or not product.barcode or not product.supplier_id or not product.dealer_id:
             flash('Please fill out all fields.', 'danger')
             return redirect(url_for('edit_product', product_id=product_id))
-
-        db.session.commit()
-        flash('Product updated successfully!', 'success')
-        return redirect(url_for('products'))
+        try:
+            db.session.commit()
+            flash('Product updated successfully!', 'success')
+            return redirect(url_for('products'))
+        except ValueError as e:
+            db.session.rollback()
+            flash(str(e), 'danger')
+            return redirect(url_for('edit_product', product_id=product_id))
 
     return render_template('edit_product.html', product=product, suppliers=suppliers, dealers=dealers, items=items, categories=categories)
 
@@ -725,26 +734,28 @@ def add_product():
         if not name or not category or not buying_price or not selling_price or not stock or not barcode or not supplier_id or not dealer_id:
             flash('Please fill out all fields.', 'danger')
             return redirect(url_for('add_product'))
+        try:
+            new_product = Product(
+                barcode=barcode,
+                name=name,
+                category=category,
+                buying_price=buying_price,
+                selling_price=selling_price,
+                current_stock=stock,
+                supplier_id=supplier_id,
+                dealer_id=dealer_id,  # Assign dealer_id to the product
+                vatable=vatable
+            )
 
-        new_product = Product(
-            barcode=barcode,
-            name=name,
-            category=category,
-            buying_price=buying_price,
-            selling_price=selling_price,
-            current_stock=stock,
-            supplier_id=supplier_id,
-            dealer_id=dealer_id,  # Assign dealer_id to the product
-            vatable=vatable
-        )
+            db.session.add(new_product)
+            db.session.commit()
 
-        db.session.add(new_product)
-        db.session.commit()
-
-        flash('Product added successfully!', 'success')
-        if redirect_url:
-            return redirect(redirect_url)
-        return redirect(url_for('products'))
+            flash('Product added successfully!', 'success')
+            # Redirect to the edit page of the newly created product
+            return redirect(url_for('edit_product', product_id=new_product.id))
+        except ValueError as e:
+            flash(str(e), 'danger')
+            return redirect(url_for('add_product'))
 
     name = request.args.get('name')
     redirect_url = request.args.get('redirect_url')
