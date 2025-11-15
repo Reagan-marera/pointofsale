@@ -60,10 +60,12 @@
                                 <td>Subtotal:</td>
                                 <td class="text-end">KSh {{ "%.2f"|format(sale.subtotal) }}</td>
                             </tr>
+                            {% if sale.tax_amount > 0 %}
                             <tr>
                                 <td>Tax (16%):</td>
                                 <td class="text-end">KSh {{ "%.2f"|format(sale.tax_amount) }}</td>
                             </tr>
+                            {% endif %}
                             <tr>
                                 <td><strong>Total:</strong></td>
                                 <td class="text-end"><strong>KSh {{ "%.2f"|format(sale.total_amount) }}</strong></td>

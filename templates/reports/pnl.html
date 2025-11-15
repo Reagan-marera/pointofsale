@@ -1,0 +1,47 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Profit and Loss Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Profit and Loss Report</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    Summary
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td>Total Sales</td>
+                                <td>KSh {{ "%.2f"|format(total_sales) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Cost of Goods Sold (COGS)</td>
+                                <td>KSh {{ "%.2f"|format(total_cogs) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Gross Profit</td>
+                                <td>KSh {{ "%.2f"|format(total_sales - total_cogs) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Total Expenses</td>
+                                <td>KSh {{ "%.2f"|format(total_expenses) }}</td>
+                            </tr>
+                            <tr class="table-success">
+                                <td><strong>Net Profit</strong></td>
+                                <td><strong>KSh {{ "%.2f"|format(net_profit) }}</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

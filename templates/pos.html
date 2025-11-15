@@ -306,16 +306,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 // Check if product is already in cart
                 const existingItem = cart.find(item => item.id === data.id);
+                if (data.stock <= 0) {
+                    alert('Product is out of stock.');
+                    return;
+                }
+
+                const existingItem = cart.find(item => item.id === data.id);
                 if (existingItem) {
-                    // If product exists, increment quantity
+                    if (existingItem.quantity + 1 > data.stock) {
+                        alert(`Not enough stock. Only ${data.stock} available.`);
+                        return;
+                    }
                     existingItem.quantity += 1;
                 } else {
-                    // If product doesn't exist, add to cart
                     cart.push({
                         id: data.id,
                         name: data.name,
                         price: data.price,
-                        quantity: 1
+                        quantity: 1,
+                        stock: data.stock
                     });
                 }
                 updateCartDisplay();
@@ -336,14 +345,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const itemTotal = parseFloat(item.price) * parseFloat(item.quantity);
             subtotal += itemTotal;
             row.innerHTML = `
-                <td>${item.name}</td>
+                <td>${item.name} <small class="text-muted">(Stock: ${item.stock})</small></td>
                 <td>KSh ${parseFloat(item.price).toFixed(2)}</td>
                 <td>
                     <input type="number"
                            class="form-control form-control-sm qty-input"
-                           step="0.01"
-                           min="0.01"
-                           value="${parseFloat(item.quantity).toFixed(2)}"
+                           step="1"
+                           min="1"
+                           value="${item.quantity}"
                            data-index="${index}"
                            onchange="updateQuantity(${index}, this.value)">
                 </td>
@@ -374,14 +383,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update quantity function
     window.updateQuantity = function(index, newQuantity) {
-        const quantity = parseFloat(newQuantity);
+        const quantity = parseInt(newQuantity);
+        const item = cart[index];
+
         if (isNaN(quantity) || quantity <= 0) {
-            alert('Please enter a valid quantity (greater than 0).');
-            updateCartDisplay(); // Reset the display
+            alert('Please enter a valid quantity.');
+            updateCartDisplay();
             return;
         }
-        // Update the cart locally
-        cart[index].quantity = quantity;
+
+        if (quantity > item.stock) {
+            alert(`Not enough stock. Only ${item.stock} available.`);
+            updateCartDisplay();
+            return;
+        }
+
+        item.quantity = quantity;
         updateCartDisplay();
     };
 
