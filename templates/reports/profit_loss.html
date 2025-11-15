@@ -1,0 +1,397 @@
+{% extends "layouts/base.html" %}
+{% block title %}Profit & Loss Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Profit & Loss Report</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button class="btn btn-sm btn-outline-secondary me-2" onclick="window.print()">
+            <i class="fas fa-print"></i> Print
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="exportToExcel()">
+            <i class="fas fa-file-excel"></i> Export
+        </button>
+    </div>
+</div>
+
+<!-- Date Range Filter -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Report Period & Tax Settings</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-3" id="reportForm">
+            <div class="col-md-4">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}" required>
+            </div>
+            <div class="col-md-4">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary">Generate Report</button>
+                    <a href="{{ url_for('profit_loss_report') }}" class="btn btn-secondary">Reset</a>
+                </div>
+            </div>
+            
+            <!-- Tax Settings -->
+            <div class="col-12 mt-3">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title">Tax Settings</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="tax_option" id="autoTax" 
+                                           value="auto" {% if not use_custom_tax %}checked{% endif %}>
+                                    <label class="form-check-label" for="autoTax">
+                                        Automatic Tax Calculation (30%)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="tax_option" id="customTax" 
+                                           value="custom" {% if use_custom_tax %}checked{% endif %}>
+                                    <label class="form-check-label" for="customTax">
+                                        Custom Tax Amount
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="customTaxSection" style="display: {% if use_custom_tax %}block{% else %}none{% endif %};">
+                                    <label for="custom_tax_amount" class="form-label">Custom Tax Amount (KSh)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">KSh</span>
+                                        <input type="number" class="form-control" id="custom_tax_amount" 
+                                               name="custom_tax_amount" step="0.01" min="0" 
+                                               value="{{ "%.2f"|format(custom_tax_amount) if custom_tax_amount else '' }}"
+                                               placeholder="Enter custom tax amount">
+                                    </div>
+                                    <small class="text-muted">
+                                        Net Income Before Taxes: KSh {{ "%.2f"|format(net_income_before_taxes) }}
+                                        {% if custom_tax_amount and net_income_before_taxes > 0 %}
+                                        ({{ "%.1f"|format((custom_tax_amount/net_income_before_taxes*100)) }}%)
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h6 class="card-title">Total Revenue</h6>
+                <h3 class="card-text">KSh {{ "%.2f"|format(total_sales_revenue) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h6 class="card-title">Gross Profit</h6>
+                <h3 class="card-text">KSh {{ "%.2f"|format(gross_profit) }}</h3>
+                <small>Margin: {{ "%.1f"|format(gross_profit_margin) }}%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h6 class="card-title">Operating Income</h6>
+                <h3 class="card-text">KSh {{ "%.2f"|format(operating_income) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-{{ 'success' if net_income >= 0 else 'danger' }}">
+            <div class="card-body">
+                <h6 class="card-title">Net Income</h6>
+                <h3 class="card-text">KSh {{ "%.2f"|format(net_income) }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed P&L Statement -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Profit & Loss Statement</h5>
+        <small class="text-muted">Period: {{ start_date }} to {{ end_date }}</small>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Description</th>
+                        <th class="text-end">Amount (KSh)</th>
+                        <th class="text-end">% of Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- REVENUE SECTION -->
+                    <tr class="table-primary">
+                        <td><strong>REVENUE</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(total_sales_revenue) }}</strong></td>
+                        <td class="text-end"><strong>100.0%</strong></td>
+                    </tr>
+                    
+                    <!-- COGS SECTION -->
+                    <tr>
+                        <td style="padding-left: 20px;">Cost of Goods Sold</td>
+                        <td class="text-end">{{ "%.2f"|format(total_cogs) }}</td>
+                        <td class="text-end">{{ "%.1f"|format((total_cogs/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</td>
+                    </tr>
+                    
+                    <!-- GROSS PROFIT -->
+                    <tr class="table-success">
+                        <td><strong>GROSS PROFIT</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(gross_profit) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.1f"|format(gross_profit_margin) }}%</strong></td>
+                    </tr>
+                    
+                    <!-- OPERATING EXPENSES -->
+                    <tr class="table-secondary">
+                        <td><strong>OPERATING EXPENSES</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(total_expenses) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.1f"|format((total_expenses/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</strong></td>
+                    </tr>
+                    
+                    {% for category, amount in expense_categories.items() if amount > 0 %}
+                    <tr>
+                        <td style="padding-left: 20px;">{{ category }}</td>
+                        <td class="text-end">{{ "%.2f"|format(amount) }}</td>
+                        <td class="text-end">{{ "%.1f"|format((amount/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</td>
+                    </tr>
+                    {% endfor %}
+                    
+                    <!-- OPERATING INCOME -->
+                    <tr class="table-warning">
+                        <td><strong>OPERATING INCOME</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(operating_income) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.1f"|format((operating_income/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</strong></td>
+                    </tr>
+                    
+                    <!-- NON-OPERATING ITEMS -->
+                    <tr class="table-info">
+                        <td><strong>NON-OPERATING ITEMS</strong></td>
+                        <td class="text-end"></td>
+                        <td class="text-end"></td>
+                    </tr>
+                    
+                    {% if interest_income > 0 %}
+                    <tr>
+                        <td style="padding-left: 20px;">Interest Income</td>
+                        <td class="text-end text-success">{{ "%.2f"|format(interest_income) }}</td>
+                        <td class="text-end">{{ "%.1f"|format((interest_income/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if interest_expense > 0 %}
+                    <tr>
+                        <td style="padding-left: 20px;">Interest Expense</td>
+                        <td class="text-end text-danger">({{ "%.2f"|format(interest_expense) }})</td>
+                        <td class="text-end">{{ "%.1f"|format((interest_expense/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</td>
+                    </tr>
+                    {% endif %}
+                    
+                    <!-- NET INCOME BEFORE TAXES -->
+                    <tr>
+                        <td><strong>Net Income Before Taxes</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(net_income_before_taxes) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.1f"|format((net_income_before_taxes/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</strong></td>
+                    </tr>
+                    
+                    <!-- INCOME TAX -->
+                    {% if income_tax_expense > 0 %}
+                    <tr>
+                        <td style="padding-left: 20px;">
+                            Income Tax Expense 
+                            {% if use_custom_tax %}
+                                (Custom Amount)
+                            {% else %}
+                                ({{ "%.1f"|format(tax_percentage) }}%)
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-danger">({{ "%.2f"|format(income_tax_expense) }})</td>
+                        <td class="text-end">{{ "%.1f"|format((income_tax_expense/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</td>
+                    </tr>
+                    {% endif %}
+                    
+                    <!-- NET INCOME -->
+                    <tr class="table-{{ 'success' if net_income >= 0 else 'danger' }}">
+                        <td><strong>NET INCOME</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(net_income) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.1f"|format((net_income/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Key Performance Indicators -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Key Performance Indicators</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Total Transactions:</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                {{ total_transactions }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Average Transaction Value:</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                KSh {{ "%.2f"|format(average_transaction_value) }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Gross Profit Margin:</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                {{ "%.1f"|format(gross_profit_margin) }}%
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Net Profit Margin:</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                {{ "%.1f"|format((net_income/total_sales_revenue*100) if total_sales_revenue > 0 else 0) }}%
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Tax Rate Applied:</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                {% if use_custom_tax %}
+                                    Custom ({{ "%.1f"|format((income_tax_expense/net_income_before_taxes*100) if net_income_before_taxes > 0 else 0) }}%)
+                                {% else %}
+                                    {{ "%.1f"|format(tax_percentage) }}%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function exportToExcel() {
+    // Simple table export to Excel
+    const table = document.querySelector('.table');
+    const html = table.outerHTML;
+    const url = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(html);
+    const link = document.createElement('a');
+    link.download = 'profit_loss_report_{{ start_date }}_to_{{ end_date }}.xls';
+    link.href = url;
+    link.click();
+}
+
+// Tax option toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const autoTaxRadio = document.getElementById('autoTax');
+    const customTaxRadio = document.getElementById('customTax');
+    const customTaxSection = document.getElementById('customTaxSection');
+    const customTaxInput = document.getElementById('custom_tax_amount');
+    const reportForm = document.getElementById('reportForm');
+    
+    // Set default dates if not provided
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
+    
+    if (!startDate.value) {
+        const firstDay = new Date();
+        firstDay.setDate(1);
+        startDate.value = firstDay.toISOString().split('T')[0];
+    }
+    
+    if (!endDate.value) {
+        const today = new Date();
+        endDate.value = today.toISOString().split('T')[0];
+    }
+    
+    // Toggle custom tax section
+    function toggleTaxSection() {
+        if (customTaxRadio.checked) {
+            customTaxSection.style.display = 'block';
+            customTaxInput.required = true;
+        } else {
+            customTaxSection.style.display = 'none';
+            customTaxInput.required = false;
+        }
+    }
+    
+    autoTaxRadio.addEventListener('change', toggleTaxSection);
+    customTaxRadio.addEventListener('change', toggleTaxSection);
+    
+    // Initialize on page load
+    toggleTaxSection();
+    
+    // Add hidden field for custom tax usage
+    reportForm.addEventListener('submit', function() {
+        const useCustomTaxInput = document.createElement('input');
+        useCustomTaxInput.type = 'hidden';
+        useCustomTaxInput.name = 'use_custom_tax';
+        useCustomTaxInput.value = customTaxRadio.checked ? 'true' : 'false';
+        reportForm.appendChild(useCustomTaxInput);
+    });
+    
+    // Auto-calculate percentage when custom tax is entered
+    customTaxInput.addEventListener('input', function() {
+        const netIncomeBeforeTaxes = {{ net_income_before_taxes }};
+        const customAmount = parseFloat(this.value) || 0;
+        
+        if (netIncomeBeforeTaxes > 0 && customAmount > 0) {
+            const percentage = (customAmount / netIncomeBeforeTaxes * 100).toFixed(1);
+            const helperText = this.parentElement.nextElementSibling;
+            helperText.innerHTML = `Net Income Before Taxes: KSh ${netIncomeBeforeTaxes.toFixed(2)} (${percentage}%)`;
+        }
+    });
+});
+</script>
+
+<style>
+@media print {
+    .btn-toolbar, .card-header .btn, .bg-light {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .table {
+        font-size: 12px;
+    }
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6;
+}
+</style>
+{% endblock %}

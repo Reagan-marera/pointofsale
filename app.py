@@ -642,20 +642,26 @@ def get_product_by_id(product_id):
         'vatable': product.vatable
     })
 
-@app.route('/api/products/<barcode>')
+@app.route('/api/products/<barcode>', methods=['GET'])
+@login_required(roles=['cashier', 'manager', 'admin'])
 def get_product_by_barcode(barcode):
-    product = Product.query.filter_by(barcode=barcode).first()
-    if product:
+    try:
+        product = Product.query.filter_by(barcode=barcode).first()
+        if not product:
+            return jsonify({'error': 'Product not found'}), 404
+
         return jsonify({
             'id': product.id,
-            'barcode': product.barcode,
             'name': product.name,
-            'price': product.selling_price,
+            'barcode': product.barcode,
+            'price': float(product.selling_price),
             'stock': product.current_stock,
-            'tax_rate': product.tax_rate,
-            'vatable': product.vatable
+            'vatable': product.vatable,
+            'tax_rate': float(product.tax_rate) if product.tax_rate else 0.0
         })
-    return jsonify({'error': 'Product not found'}), 404
+    except Exception as e:
+        app.logger.error(f"Error fetching product: {e}")
+        return jsonify({'error': 'Failed to fetch product'}), 500
 # Add user management routes
 @app.route('/admin/users/add', methods=['POST'])
 @login_required(roles=['admin'])
@@ -790,21 +796,36 @@ def add_product():
 def pos():
     return render_template('pos.html')
 
-@app.route('/api/products/search')
+@app.route('/api/products/search', methods=['GET'])
+@login_required(roles=['cashier', 'manager', 'admin'])
 def search_products():
-    search_term = request.args.get('q')
-    if not search_term:
+    try:
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify([])
+
+        # Search by name or barcode
+        products = Product.query.filter(
+            db.or_(
+                Product.name.ilike(f'%{query}%'),
+                Product.barcode.ilike(f'%{query}%')
+            )
+        ).limit(10).all()
+
+        result = []
+        for product in products:
+            result.append({
+                'id': product.id,
+                'name': product.name,
+                'barcode': product.barcode,
+                'price': float(product.selling_price),
+                'stock': product.current_stock
+            })
+
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"Error searching products: {e}")
         return jsonify([])
-
-    products = Product.query.filter(
-        or_(
-            Product.name.ilike(f'%{search_term}%'),
-            Product.barcode.ilike(f'%{search_term}%')
-        )
-    ).all()
-
-    return jsonify([{'id': p.id, 'name': p.name, 'barcode': p.barcode, 'price': p.selling_price} for p in products])
-
 @app.route('/api/sales', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
 def create_sale():
@@ -2053,6 +2074,145 @@ def award_supplier_quotation(quotation_id):
 
     flash(f'Quotation from {quotation.supplier.name} has been awarded.', 'success')
     return redirect(url_for('supplier_quotations'))
-
+@app.route('/admin/reports/profit_loss')
+@login_required(roles=['manager', 'admin'])
+def profit_loss_report():
+    try:
+        # Get date range from request or default to current month
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        if start_date_str and end_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+        else:
+            # Default to current month
+            today = datetime.today()
+            start_date = today.replace(day=1)
+            end_date = (start_date + timedelta(days=32)).replace(day=1)
+        
+        # Get custom tax amount from request
+        custom_tax_amount = request.args.get('custom_tax_amount', type=float)
+        use_custom_tax = request.args.get('use_custom_tax') == 'true'
+        
+        # REVENUE SECTION
+        # Total Sales Revenue
+        sales_query = Sale.query.filter(Sale.sale_date >= start_date, Sale.sale_date < end_date)
+        if session['role'] == 'cashier':
+            sales_query = sales_query.filter(Sale.user_id == session['user_id'])
+        
+        total_sales_revenue = sales_query.with_entities(func.sum(Sale.total_amount)).scalar() or 0
+        
+        # COST OF GOODS SOLD (COGS)
+        cogs_query = db.session.query(func.sum(SaleItem.quantity * Product.buying_price))\
+            .join(Sale, Sale.id == SaleItem.sale_id)\
+            .join(Product, Product.id == SaleItem.product_id)\
+            .filter(Sale.sale_date >= start_date, Sale.sale_date < end_date)
+        
+        if session['role'] == 'cashier':
+            cogs_query = cogs_query.filter(Sale.user_id == session['user_id'])
+        
+        total_cogs = cogs_query.scalar() or 0
+        
+        # GROSS PROFIT
+        gross_profit = total_sales_revenue - total_cogs
+        gross_profit_margin = (gross_profit / total_sales_revenue * 100) if total_sales_revenue > 0 else 0
+        
+        # OPERATING EXPENSES
+        expenses_query = Expense.query.filter(Expense.date >= start_date, Expense.date < end_date)
+        if session['role'] == 'cashier':
+            expenses_query = expenses_query.filter(Expense.user_id == session['user_id'])
+        
+        total_expenses = expenses_query.with_entities(func.sum(Expense.amount)).scalar() or 0
+        
+        # Categorize expenses
+        expense_categories = {
+            'Salaries & Wages': 0,
+            'Rent & Utilities': 0,
+            'Marketing & Advertising': 0,
+            'Supplies & Materials': 0,
+            'Transport & Delivery': 0,
+            'Other Expenses': 0
+        }
+        
+        all_expenses = expenses_query.all()
+        for expense in all_expenses:
+            description_lower = expense.description.lower()
+            if any(word in description_lower for word in ['salary', 'wage', 'payroll']):
+                expense_categories['Salaries & Wages'] += float(expense.amount)
+            elif any(word in description_lower for word in ['rent', 'utility', 'electric', 'water']):
+                expense_categories['Rent & Utilities'] += float(expense.amount)
+            elif any(word in description_lower for word in ['marketing', 'advert', 'promo']):
+                expense_categories['Marketing & Advertising'] += float(expense.amount)
+            elif any(word in description_lower for word in ['supply', 'material', 'stationery']):
+                expense_categories['Supplies & Materials'] += float(expense.amount)
+            elif any(word in description_lower for word in ['transport', 'delivery', 'fuel']):
+                expense_categories['Transport & Delivery'] += float(expense.amount)
+            else:
+                expense_categories['Other Expenses'] += float(expense.amount)
+        
+        # OPERATING INCOME
+        operating_income = gross_profit - total_expenses
+        
+        # NON-OPERATING ITEMS
+        interest_income = FinancierCredit.query.filter(
+            FinancierCredit.date >= start_date, 
+            FinancierCredit.date < end_date
+        ).with_entities(func.sum(FinancierCredit.amount_credited)).scalar() or 0
+        
+        interest_expense = FinancierDebit.query.filter(
+            FinancierDebit.date >= start_date, 
+            FinancierDebit.date < end_date
+        ).with_entities(func.sum(FinancierDebit.interest_amount)).scalar() or 0
+        
+        # NET INCOME BEFORE TAXES
+        net_income_before_taxes = operating_income + interest_income - interest_expense
+        
+        # TAX CALCULATION - Editable
+        tax_rate = 0.30  # Default 30%
+        
+        if use_custom_tax and custom_tax_amount is not None:
+            income_tax_expense = custom_tax_amount
+            tax_percentage = (custom_tax_amount / net_income_before_taxes * 100) if net_income_before_taxes > 0 else 0
+        else:
+            income_tax_expense = net_income_before_taxes * tax_rate if net_income_before_taxes > 0 else 0
+            tax_percentage = tax_rate * 100
+        
+        # NET INCOME AFTER TAXES
+        net_income = net_income_before_taxes - income_tax_expense
+        
+        # KEY PERFORMANCE INDICATORS
+        total_transactions = sales_query.count()
+        average_transaction_value = total_sales_revenue / total_transactions if total_transactions > 0 else 0
+        
+        # Format dates for display
+        start_date_display = start_date.strftime('%Y-%m-%d')
+        end_date_display = (end_date - timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        return render_template('reports/profit_loss.html',
+                            start_date=start_date_display,
+                            end_date=end_date_display,
+                            total_sales_revenue=total_sales_revenue,
+                            total_cogs=total_cogs,
+                            gross_profit=gross_profit,
+                            gross_profit_margin=gross_profit_margin,
+                            total_expenses=total_expenses,
+                            expense_categories=expense_categories,
+                            operating_income=operating_income,
+                            interest_income=interest_income,
+                            interest_expense=interest_expense,
+                            net_income_before_taxes=net_income_before_taxes,
+                            income_tax_expense=income_tax_expense,
+                            tax_percentage=tax_percentage,
+                            net_income=net_income,
+                            total_transactions=total_transactions,
+                            average_transaction_value=average_transaction_value,
+                            custom_tax_amount=custom_tax_amount,
+                            use_custom_tax=use_custom_tax)
+    
+    except Exception as e:
+        app.logger.error(f"Error generating profit loss report: {e}")
+        flash('Error generating profit loss report', 'danger')
+        return redirect(url_for('dashboard'))
 if __name__ == '__main__':
     app.run(debug=True)

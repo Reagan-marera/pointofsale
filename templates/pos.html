@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cart state
     let cart = [];
     let searchTimeout = null;
-    let lastReceiptNumber = null; // Store the last receipt number
+    let lastReceiptNumber = null;
 
     // Event Listeners
     scanBtn.addEventListener('click', function() {
@@ -164,9 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Open the print view in a new window
         const printWindow = window.open(`/receipt/print/${lastReceiptNumber}`, '_blank');
-
         if (!printWindow) {
             alert('Popup blocked! Please allow popups to print receipts.');
         }
@@ -175,19 +173,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add search functionality
     productSearch.addEventListener('input', function() {
         const searchTerm = this.value.trim();
-        // Clear timeout if user is still typing
         if (searchTimeout) {
             clearTimeout(searchTimeout);
         }
-        // Only search if there's input
         if (searchTerm.length > 0) {
-            // Show loading state
             productList.style.display = 'block';
             productList.innerHTML = '<div class="list-group-item">Searching...</div>';
-            // Debounce search to avoid too many requests
             searchTimeout = setTimeout(() => {
                 searchProducts(searchTerm);
-            }, 300); // 300ms delay
+            }, 300);
         } else {
             productList.style.display = 'none';
         }
@@ -217,6 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
         const splitPayment = document.getElementById('split-payment').checked;
+        
         fetch('/api/sales', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -229,7 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                lastReceiptNumber = data.receipt_number; // Store the receipt number
+                lastReceiptNumber = data.receipt_number;
                 alert(`Checkout successful! Receipt #${data.receipt_number}`);
                 cart = [];
                 updateCartDisplay();
@@ -247,9 +242,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Functions
     function searchProducts(searchTerm) {
+        console.log('Searching for:', searchTerm); // Debug log
         fetch(`/api/products/search?q=${encodeURIComponent(searchTerm)}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Search results:', data); // Debug log
                 if (data && data.length > 0) {
                     displayProductResults(data);
                 } else {
@@ -258,7 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Search error:', error);
-                productList.innerHTML = '<div class="list-group-item">Error loading products</div>';
+                productList.innerHTML = '<div class="list-group-item">Error loading products: ' + error.message + '</div>';
             });
     }
 
@@ -271,13 +273,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="mb-0">${product.name}</h6>
-                        <small class="text-muted">Barcode: ${product.barcode}</small>
-                        <small class="text-muted">KSh ${parseFloat(product.price).toFixed(2)}</small>
+                        <small class="text-muted d-block">Barcode: ${product.barcode}</small>
+                        <small class="text-muted">KSh ${parseFloat(product.price).toFixed(2)} | Stock: ${product.stock}</small>
                     </div>
                     <button class="btn btn-sm btn-outline-primary add-product-btn"
-                            data-barcode="${product.barcode}"
-                            data-name="${product.name}"
-                            data-price="${product.price}">
+                            data-barcode="${product.barcode}">
                         Add
                     </button>
                 </div>
@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
             productList.appendChild(item);
         });
         productList.style.display = 'block';
+        
         // Add event listeners to the "Add" buttons
         document.querySelectorAll('.add-product-btn').forEach(button => {
             button.addEventListener('click', function() {
@@ -297,13 +298,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function addToCart(barcode) {
+        console.log('Adding to cart:', barcode); // Debug log
         fetch('/api/products/' + barcode)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Product not found');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.error) {
                     alert(data.error);
                     return;
                 }
+                
                 // Check if product is already in cart
                 const existingItem = cart.find(item => item.id === data.id);
                 if (data.stock <= 0) {
@@ -311,7 +319,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                const existingItem = cart.find(item => item.id === data.id);
                 if (existingItem) {
                     if (existingItem.quantity + 1 > data.stock) {
                         alert(`Not enough stock. Only ${data.stock} available.`);
@@ -333,17 +340,19 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Failed to add item. Please try again.');
+                alert('Failed to add item: ' + error.message);
             });
     }
 
     function updateCartDisplay() {
         cartItems.innerHTML = '';
         let subtotal = 0;
+        
         cart.forEach((item, index) => {
-            const row = document.createElement('tr');
             const itemTotal = parseFloat(item.price) * parseFloat(item.quantity);
             subtotal += itemTotal;
+            
+            const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${item.name} <small class="text-muted">(Stock: ${item.stock})</small></td>
                 <td>KSh ${parseFloat(item.price).toFixed(2)}</td>
@@ -352,9 +361,9 @@ document.addEventListener('DOMContentLoaded', function() {
                            class="form-control form-control-sm qty-input"
                            step="1"
                            min="1"
+                           max="${item.stock}"
                            value="${item.quantity}"
-                           data-index="${index}"
-                           onchange="updateQuantity(${index}, this.value)">
+                           data-index="${index}">
                 </td>
                 <td>KSh ${itemTotal.toFixed(2)}</td>
                 <td>
@@ -365,24 +374,35 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             cartItems.appendChild(row);
         });
-        // Update remove buttons
+
+        // Add event listeners for quantity changes
+        document.querySelectorAll('.qty-input').forEach(input => {
+            input.addEventListener('change', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                const newQuantity = parseInt(this.value);
+                updateQuantity(index, newQuantity);
+            });
+        });
+
+        // Add event listeners for remove buttons
         document.querySelectorAll('.remove-item').forEach(button => {
             button.addEventListener('click', function() {
                 const index = parseInt(this.getAttribute('data-index'));
                 removeItem(index);
             });
         });
-        // Calculate tax and total
+
+        // Calculate totals
         const taxRate = 0.16;
         const tax = subtotal * taxRate;
         const total = subtotal + tax;
+        
         subtotalEl.textContent = `KSh ${subtotal.toFixed(2)}`;
         taxEl.textContent = `KSh ${tax.toFixed(2)}`;
         totalEl.textContent = `KSh ${total.toFixed(2)}`;
     }
 
-    // Update quantity function
-    window.updateQuantity = function(index, newQuantity) {
+    function updateQuantity(index, newQuantity) {
         const quantity = parseInt(newQuantity);
         const item = cart[index];
 
@@ -400,9 +420,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         item.quantity = quantity;
         updateCartDisplay();
-    };
+    }
 
-    // Remove item function
     function removeItem(index) {
         cart.splice(index, 1);
         updateCartDisplay();
