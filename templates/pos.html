@@ -305,7 +305,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 // Check if product is already in cart
-                const existingItem = cart.find(item => item.id === data.id);
                 if (data.stock <= 0) {
                     alert('Product is out of stock.');
                     return;

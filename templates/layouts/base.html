@@ -108,6 +108,11 @@
                                 <i class="fas fa-user-chart"></i> Employee Reports
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'pnl_report' %}active{% endif %}" href="{{ url_for('pnl_report') }}">
+                                <i class="fas fa-file-invoice-dollar"></i> Profit & Loss
+                            </a>
+                        </li>
                         {% endif %}
                         {% if session.role in ['manager', 'admin', 'cashier'] %}
                         <li class="nav-item">
