@@ -89,7 +89,7 @@
                         {% for product in products %}
                         <tr>
                             <td>{{ product.id }}</td>
-                            <td>{{ product.name }}</td>
+                            <td>{{ product.name }} [{{ product.barcode }}]</td>
                             <td>{{ product.category }}</td>
                             <td>{{ product.dealer.name if product.dealer else 'No Dealer' }}</td>
                             <td>{{ product.current_stock }}</td>

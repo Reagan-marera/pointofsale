@@ -539,6 +539,27 @@ def supplier_report():
 
     return render_template('supplier_report.html', suppliers=suppliers, products=products_data)
 
+@app.route('/admin/reports/pnl')
+@login_required(roles=['manager', 'admin'])
+def pnl_report():
+    # Get total sales
+    total_sales = db.session.query(func.sum(Sale.total_amount)).scalar() or 0
+
+    # Get total COGS
+    total_cogs = db.session.query(func.sum(SaleItem.quantity * Product.buying_price)).join(Product).scalar() or 0
+
+    # Get total expenses
+    total_expenses = db.session.query(func.sum(Expense.amount)).scalar() or 0
+
+    # Calculate net profit
+    net_profit = total_sales - total_cogs - total_expenses
+
+    return render_template('reports/pnl.html',
+                           total_sales=total_sales,
+                           total_cogs=total_cogs,
+                           total_expenses=total_expenses,
+                           net_profit=net_profit)
+
 @app.route('/admin/reports/sales')
 @login_required(roles=['manager'])
 def sales_report():
@@ -716,6 +737,7 @@ def add_product():
         buying_price = float(request.form['buying_price'])
         selling_price = float(request.form['selling_price'])
         stock = int(request.form['stock'])
+        min_stock_level = int(request.form['min_stock'])
         barcode = request.form['barcode'].strip()
         supplier_id = request.form['supplier_id']
         dealer_id = request.form['dealer_id']  # Get dealer_id from form
@@ -742,8 +764,9 @@ def add_product():
                 buying_price=buying_price,
                 selling_price=selling_price,
                 current_stock=stock,
+                min_stock_level=min_stock_level,
                 supplier_id=supplier_id,
-                dealer_id=dealer_id,  # Assign dealer_id to the product
+                dealer_id=dealer_id,
                 vatable=vatable
             )
 
@@ -801,11 +824,14 @@ def create_sale():
         tax = 0
         for item in items:
             product = Product.query.get(item['id'])
-            if product:
-                item_total = product.selling_price * item['quantity']
-                subtotal += item_total
-                if product.vatable:
-                    tax += item_total * product.tax_rate
+            if not product or product.current_stock < item['quantity']:
+                app.logger.warning(f"Checkout failed: Insufficient stock for product {item['id']}")
+                return jsonify({'error': f"Insufficient stock for {product.name}. Only {product.current_stock} left."}), 400
+
+            item_total = product.selling_price * item['quantity']
+            subtotal += item_total
+            if product.vatable and product.tax_rate:
+                tax += item_total * product.tax_rate
 
         total = subtotal + tax
         app.logger.info(f"Calculated totals: subtotal={subtotal}, tax={tax}, total={total}")
