@@ -341,7 +341,24 @@ def edit_product(product_id):
         product.selling_price = float(request.form['selling_price'])
         product.current_stock = int(request.form['stock'])
         product.min_stock_level = int(request.form['min_stock'])
-        product.barcode = request.form['barcode'].strip()
+        
+        # Get the submitted barcode
+        submitted_barcode = request.form['barcode'].strip()
+        
+        # Only update barcode if it's different from current barcode
+        if submitted_barcode != product.barcode:
+            # Check if new barcode already exists for another product
+            existing_product = Product.query.filter(
+                Product.barcode == submitted_barcode,
+                Product.id != product_id  # Exclude current product
+            ).first()
+            
+            if existing_product:
+                flash(f'Barcode "{submitted_barcode}" already exists for product "{existing_product.name}".', 'danger')
+                return redirect(url_for('edit_product', product_id=product_id))
+            
+            product.barcode = submitted_barcode
+        
         product.supplier_id = request.form['supplier_id']
         product.dealer_id = request.form['dealer_id']
         product.vatable = 'vatable' in request.form
@@ -349,6 +366,7 @@ def edit_product(product_id):
         if not product.name or not product.category or not product.buying_price or not product.selling_price or not product.current_stock or not product.min_stock_level or not product.barcode or not product.supplier_id or not product.dealer_id:
             flash('Please fill out all fields.', 'danger')
             return redirect(url_for('edit_product', product_id=product_id))
+        
         try:
             db.session.commit()
             flash('Product updated successfully!', 'success')
@@ -359,7 +377,6 @@ def edit_product(product_id):
             return redirect(url_for('edit_product', product_id=product_id))
 
     return render_template('edit_product.html', product=product, suppliers=suppliers, dealers=dealers, items=items, categories=categories)
-
 @app.route('/items', methods=['GET', 'POST'])
 @login_required(roles=['manager', 'admin'])
 def manage_items():
@@ -569,52 +586,96 @@ def sales_report():
     payment_method = request.args.get('payment_method')
     product_search = request.args.get('product_search')
     
-    # Build query
-    query = Sale.query.options(
+    # Build base query for ALL sales (for totals)
+    base_query = Sale.query
+    
+    # Apply filters to base query
+    if start_date:
+        start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+        base_query = base_query.filter(Sale.sale_date >= start_date_obj)
+    
+    if end_date:
+        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+        base_query = base_query.filter(Sale.sale_date < end_date_obj)
+    
+    if payment_method:
+        base_query = base_query.filter(Sale.payment_method == payment_method)
+    
+    # Handle product search separately
+    if product_search:
+        # For totals: get sale IDs that have the searched product
+        sale_ids_with_product = db.session.query(SaleItem.sale_id).join(Product).filter(
+            (Product.name.ilike(f'%{product_search}%')) |
+            (Product.barcode.ilike(f'%{product_search}%'))
+        ).distinct()
+        
+        base_query = base_query.filter(Sale.id.in_(sale_ids_with_product))
+    
+    # Calculate totals from ALL matching sales
+    total_sales_result = base_query.with_entities(func.sum(Sale.total_amount)).scalar()
+    total_sales = total_sales_result if total_sales_result else 0
+    
+    total_transactions_result = base_query.count()
+    total_transactions = total_transactions_result if total_transactions_result else 0
+    
+    average_sale = total_sales / total_transactions if total_transactions > 0 else 0
+    
+    # Build display query with joins for showing sales details - NO LIMIT
+    display_query = Sale.query.options(
         joinedload(Sale.items).joinedload(SaleItem.product),
         joinedload(Sale.user)
     )
     
-    if product_search:
-        query = query.join(SaleItem).join(Product).filter(
-            (Product.name.ilike(f'%{product_search}%')) |
-            (Product.barcode.ilike(f'%{product_search}%'))
-        )
-
+    # Apply the same filters to display query
     if start_date:
-        start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
-        query = query.filter(Sale.sale_date >= start_date_obj)
+        display_query = display_query.filter(Sale.sale_date >= start_date_obj)
     
     if end_date:
-        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-        query = query.filter(Sale.sale_date < end_date_obj)
+        display_query = display_query.filter(Sale.sale_date < end_date_obj)
     
     if payment_method:
-        query = query.filter(Sale.payment_method == payment_method)
+        display_query = display_query.filter(Sale.payment_method == payment_method)
     
-    # Get sales data
-    sales = query.order_by(Sale.sale_date.desc()).limit(50).all()
+    if product_search:
+        display_query = display_query.filter(Sale.id.in_(sale_ids_with_product))
     
-    # Calculate totals
-    total_sales = sum(sale.total_amount for sale in sales) if sales else 0
-    total_transactions = len(sales)
-    average_sale = total_sales / total_transactions if total_transactions > 0 else 0
+    # Get ALL sales data for display (no limit, no pagination)
+    sales = display_query.order_by(Sale.sale_date.desc()).all()
     
-    # Sales by payment method
-    sales_by_method_query = db.session.query(
+    # Sales by payment method - use the same base_query for consistency
+    sales_by_method_query = base_query.with_entities(
         Sale.payment_method,
         func.count(Sale.id).label('count'),
         func.sum(Sale.total_amount).label('total')
-    )
-
+    ).group_by(Sale.payment_method)
+    
+    sales_by_method = sales_by_method_query.all()
+    
+    # FIXED: Calculate profit with proper joins
+    profit_query = db.session.query(
+        func.sum(SaleItem.quantity * (SaleItem.unit_price - Product.buying_price))
+    ).select_from(SaleItem)\
+     .join(Product, SaleItem.product_id == Product.id)\
+     .join(Sale, SaleItem.sale_id == Sale.id)
+    
+    # Apply the same filters to profit query
     if start_date:
-        sales_by_method_query = sales_by_method_query.filter(Sale.sale_date >= datetime.strptime(start_date, '%Y-%m-%d'))
+        profit_query = profit_query.filter(Sale.sale_date >= start_date_obj)
     if end_date:
-        sales_by_method_query = sales_by_method_query.filter(Sale.sale_date < (datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)))
+        profit_query = profit_query.filter(Sale.sale_date < end_date_obj)
     if payment_method:
-        sales_by_method_query = sales_by_method_query.filter(Sale.payment_method == payment_method)
-
-    sales_by_method = sales_by_method_query.group_by(Sale.payment_method).all()
+        profit_query = profit_query.filter(Sale.payment_method == payment_method)
+    if product_search:
+        profit_query = profit_query.filter(Sale.id.in_(sale_ids_with_product))
+    
+    total_profit_result = profit_query.scalar()
+    total_profit = total_profit_result if total_profit_result else 0
+    
+    # Debug: Check if totals match
+    print(f"Total transactions from base_query: {total_transactions}")
+    print(f"Total sales displayed: {len(sales)}")
+    print(f"Total sales from base_query: {total_sales}")
+    print(f"Total profit: {total_profit}")
     
     # Prepare data for chart
     payment_method_labels = [method[0].capitalize() for method in sales_by_method] if sales_by_method else []
@@ -625,10 +686,11 @@ def sales_report():
                         total_sales=total_sales,
                         total_transactions=total_transactions,
                         average_sale=average_sale,
+                        total_profit=total_profit,
                         sales_by_method=sales_by_method,
                         payment_method_labels=payment_method_labels,
                         payment_method_data=payment_method_data)
-
+    
 @app.route('/api/products/id/<int:product_id>')
 def get_product_by_id(product_id):
     product = Product.query.get_or_404(product_id)
@@ -754,14 +816,16 @@ def add_product():
             flash('Barcode is required.', 'danger')
             return redirect(url_for('add_product'))
 
+        # Check for existing barcode
         existing = Product.query.filter_by(barcode=barcode).first()
         if existing:
-            flash('A product with this barcode already exists.', 'danger')
+            flash(f'A product with barcode "{barcode}" already exists.', 'danger')
             return redirect(url_for('add_product'))
 
         if not name or not category or not buying_price or not selling_price or not stock or not barcode or not supplier_id or not dealer_id:
             flash('Please fill out all fields.', 'danger')
             return redirect(url_for('add_product'))
+        
         try:
             new_product = Product(
                 barcode=barcode,
@@ -789,7 +853,6 @@ def add_product():
     name = request.args.get('name')
     redirect_url = request.args.get('redirect_url')
     return render_template('add_product.html', suppliers=suppliers, dealers=dealers, items=items, categories=categories, name=name, redirect_url=redirect_url)
-
 
 @app.route('/pos')
 @login_required(roles=['cashier', 'manager', 'admin'])
@@ -1228,9 +1291,6 @@ def finalize_purchase_order(order_id):
 
 
 
-
-
-
 @app.route('/admin/inventory')
 @login_required(roles=['manager', 'admin'])
 def inventory_management():
@@ -1259,13 +1319,25 @@ def inventory_management():
         )
 
     products = products_query.all()
-    inventory_movements = movements_query.order_by(InventoryMovement.movement_date.desc()).limit(50).all()
-    purchase_orders = purchase_orders_query.order_by(PurchaseOrder.order_date.desc()).limit(50).all()
+    # REMOVED LIMITS: Show all inventory movements and purchase orders
+    inventory_movements = movements_query.order_by(InventoryMovement.movement_date.desc()).all()
+    purchase_orders = purchase_orders_query.order_by(PurchaseOrder.order_date.desc()).all()
 
     # Financials
-    total_sales_amount = sales_items_query.with_entities(func.sum(SaleItem.total_price)).scalar() or 0
+    total_sales_amount = sales_items_query.with_entities(func.sum(SaleItem.quantity * SaleItem.unit_price)).scalar() or 0
     total_cogs = sales_items_query.with_entities(func.sum(SaleItem.quantity * Product.buying_price)).scalar() or 0
-    total_purchase_amount = sum(p.buying_price * p.current_stock for p in products)
+    
+    # Calculate total purchase amount (all products ever purchased - both sold and in stock)
+    total_products_purchased = 0
+    for p in products:
+        # Get total quantity sold for this product
+        total_sold = sales_items_query.filter(SaleItem.product_id == p.id).with_entities(func.sum(SaleItem.quantity)).scalar() or 0
+        # Total purchased = current stock + total sold
+        total_purchased = p.current_stock + total_sold
+        total_products_purchased += p.buying_price * total_purchased
+    
+    total_purchase_amount = total_products_purchased
+    
     total_expense_amount = db.session.query(func.sum(Expense.amount)).scalar() or 0
     net_profit = total_sales_amount - total_cogs - total_expense_amount
 
@@ -1279,7 +1351,6 @@ def inventory_management():
                          total_purchase_amount=total_purchase_amount,
                          total_expense_amount=total_expense_amount,
                          net_profit=net_profit)
-
 @app.route('/suppliers')
 @login_required(roles=['manager', 'admin'])
 def list_suppliers():
