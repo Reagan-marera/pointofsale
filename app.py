@@ -396,9 +396,23 @@ def manage_items():
 @login_required(roles=['admin'])
 def delete_item(item_id):
     item = Item.query.get_or_404(item_id)
-    db.session.delete(item)
-    db.session.commit()
-    flash('Item deleted successfully!', 'success')
+    
+    try:
+        # First delete all related purchase order items
+        PurchaseOrderItem.query.filter_by(item_id=item_id).delete()
+        
+        # Then delete all related supplier quotation items
+        SupplierQuotationItem.query.filter_by(item_id=item_id).delete()
+        
+        # Now delete the item
+        db.session.delete(item)
+        db.session.commit()
+        
+        flash('Item and all related records deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting item: {str(e)}', 'danger')
+    
     return redirect(url_for('manage_items'))
 
 @app.route('/categories', methods=['GET', 'POST'])
@@ -788,7 +802,6 @@ def toggle_user_status(user_id):
     
     flash(f'User {"activated" if user.is_active else "deactivated"} successfully', 'success')
     return redirect(url_for('manage_users'))
-
 
 
 @app.route('/products/add', methods=['GET', 'POST'])

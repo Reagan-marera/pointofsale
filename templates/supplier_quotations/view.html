@@ -1,57 +1,48 @@
 {% extends "layouts/base.html" %}
-{% block title %}View Purchase Order{% endblock %}
+{% block title %}View Supplier Quotation{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Purchase Order Details</h1>
+    <h1 class="h2">Supplier Quotation Details</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        <a href="{{ url_for('manage_purchase_orders') }}" class="btn btn-sm btn-outline-secondary">Back to List</a>
+        <a href="{{ url_for('supplier_quotations') }}" class="btn btn-sm btn-outline-secondary">Back to List</a>
     </div>
 </div>
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><strong>Order Number:</strong> {{ order.order_number }}</span>
-        <span class="badge bg-{% if order.status == 'pending' %}warning{% elif order.status == 'received' %}success{% else %}secondary{% endif %}">
-            {{ order.status.capitalize() }}
+        <span><strong>Quotation Number:</strong> {{ quotation.id }}</span>
+        <span class="badge bg-{% if quotation.status == 'pending' %}warning{% elif quotation.status == 'awarded' %}success{% elif quotation.status == 'declined' %}danger{% else %}secondary{% endif %}">
+            {{ quotation.status.capitalize() }}
         </span>
     </div>
     <div class="card-body">
         <div class="row mb-3">
             <div class="col-md-6">
-                <p><strong>Supplier:</strong> {{ order.supplier.name }}</p>
-                <p><strong>Order Date:</strong> {{ order.order_date.strftime('%Y-%m-%d') }}</p>
-                <p><strong>Ordered By:</strong> {{ order.user.username }}</p>
+                <p><strong>Supplier:</strong> {{ quotation.supplier.name }}</p>
+                <p><strong>Quotation Date:</strong> {{ quotation.quotation_date.strftime('%Y-%m-%d') if quotation.quotation_date else 'N/A' }}</p>
             </div>
             <div class="col-md-6 text-md-end">
-                <p><strong>Total Amount:</strong> {{ "%.2f"|format(order.total_amount) }}</p>
+                <p><strong>Total Amount:</strong> {{ "%.2f"|format(quotation.total_amount) }}</p>
             </div>
         </div>
         <hr>
-        <h4>Order Items</h4>
+        <h4>Quotation Items</h4>
         <div class="table-responsive">
             <table class="table table-bordered">
                 <thead>
                     <tr>
-                        <th>Product Name</th>
+                        <th>Item Name</th>
                         <th>Quantity</th>
                         <th>Unit Price</th>
                         <th>Total Price</th>
-                        <th>Total Purchases (All Time)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in order.items %}
+                    {% for item in quotation.items %}
                     <tr>
                         <td>{{ item.item.name }}</td>
                         <td>{{ item.quantity }}</td>
                         <td>{{ "%.2f"|format(item.unit_price) }}</td>
                         <td>{{ "%.2f"|format(item.total_price) }}</td>
-                        <td>
-                            {% set total_purchases = namespace(value=0) %}
-                            {% for movement in item.item.inventory_movements if movement.movement_type == 'purchase' %}
-                                {% set total_purchases.value = total_purchases.value + movement.quantity %}
-                            {% endfor %}
-                            {{ total_purchases.value }}
-                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -60,15 +51,15 @@
         <hr>
         <div class="d-flex justify-content-between">
             <div>
-                <a href="{{ url_for('edit_purchase_order', order_id=order.id) }}" class="btn btn-warning">Edit</a>
+                <a href="{{ url_for('edit_supplier_quotation', quotation_id=quotation.id) }}" class="btn btn-warning">Edit</a>
             </div>
             <div>
-                {% if order.status == 'pending' %}
-                <form action="{{ url_for('receive_purchase_order', order_id=order.id) }}" method="POST" class="d-inline">
-                    <button type="submit" class="btn btn-success">Mark as Received</button>
+                {% if quotation.status == 'pending' %}
+                <form action="{{ url_for('award_supplier_quotation', quotation_id=quotation.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-success">Award Quotation</button>
                 </form>
                 {% endif %}
-                <form action="{{ url_for('delete_purchase_order', order_id=order.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this purchase order?');">
+                <form action="{{ url_for('delete_supplier_quotation', quotation_id=quotation.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this supplier quotation?');">
                     <button type="submit" class="btn btn-danger">Delete</button>
                 </form>
             </div>
