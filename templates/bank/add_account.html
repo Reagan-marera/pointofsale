@@ -1,0 +1,115 @@
+{% extends "layouts/base.html" %}
+{% block title %}Add Bank Account{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Add Bank Account</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('manage_bank_accounts') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Accounts
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Bank Account Information</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_bank_account') }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="bank_name" class="form-label">Bank Name *</label>
+                            <input type="text" class="form-control" id="bank_name" name="bank_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="branch_code" class="form-label">Branch Code</label>
+                            <input type="text" class="form-control" id="branch_code" name="branch_code">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="account_name" class="form-label">Account Name *</label>
+                            <input type="text" class="form-control" id="account_name" name="account_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="account_number" class="form-label">Account Number *</label>
+                            <input type="text" class="form-control" id="account_number" name="account_number" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="account_type" class="form-label">Account Type</label>
+                            <select class="form-select" id="account_type" name="account_type">
+                                <option value="checking">Checking/Current</option>
+                                <option value="savings">Savings</option>
+                                <option value="business">Business</option>
+                                <option value="merchant">Merchant</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="currency" class="form-label">Currency</label>
+                            <select class="form-select" id="currency" name="currency">
+                                <option value="KES" selected>KES (Kenyan Shilling)</option>
+                                <option value="USD">USD (US Dollar)</option>
+                                <option value="EUR">EUR (Euro)</option>
+                                <option value="GBP">GBP (British Pound)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="is_primary" name="is_primary">
+                            <label class="form-check-label" for="is_primary">
+                                Set as primary account
+                            </label>
+                            <small class="form-text text-muted d-block">
+                                Primary account will be used as default for transactions
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <button type="reset" class="btn btn-secondary">Clear</button>
+                        <button type="submit" class="btn btn-primary">Add Bank Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Bank Integration Options</h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-lightning"></i> Quick Connect</h6>
+                    <p>Connect your bank account automatically using:</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('connect_bank_api') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-plug"></i> Connect via Plaid API
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary disabled">
+                            <i class="bi bi-bank"></i> Connect via Teller API
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-shield-check"></i> Security Notice</h6>
+                    <small>
+                        Your bank account information is encrypted and stored securely.
+                        Never share your login credentials with anyone.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

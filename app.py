@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category
+from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category,BankTransaction,BankAccount,PaymentGateway,BankAPIConnection
 from datetime import datetime,timedelta
 import random
 from sqlalchemy.orm import joinedload
@@ -9,6 +9,15 @@ from config import Config
 from sqlalchemy import func, or_
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash
+import os  
+
+import stripe
+import plaid
+from plaid.api import plaid_api
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
+from plaid.model.products import Products
+from plaid.model.country_code import CountryCode
 
 app = Flask(__name__)
 application = app  
@@ -18,7 +27,9 @@ db.init_app(app)
 migrate = Migrate(app, db)
 mail = Mail(app)
 
-
+os.environ['PLAID_CLIENT_ID'] = '5e8f4c4b5a3b3a0014d4d3a7'
+os.environ['PLAID_SECRET'] = 'ab5c2e1234567890abcdef123456'
+os.environ['PLAID_ENVIRONMENT'] = 'sandbox'
 # Create tables and default admin user
 with app.app_context():
     db.create_all()
@@ -570,7 +581,7 @@ def supplier_report():
 
     return render_template('supplier_report.html', suppliers=suppliers, products=products_data)
 
-@app.route('/admin/reports/pnl')
+@app.route('/admin/reports/profit_loss')
 @login_required(roles=['manager', 'admin'])
 def pnl_report():
     # Get total sales
@@ -585,7 +596,7 @@ def pnl_report():
     # Calculate net profit
     net_profit = total_sales - total_cogs - total_expenses
 
-    return render_template('reports/pnl.html',
+    return render_template('reports/profit_loss.html',
                            total_sales=total_sales,
                            total_cogs=total_cogs,
                            total_expenses=total_expenses,
@@ -2298,5 +2309,770 @@ def profit_loss_report():
         app.logger.error(f"Error generating profit loss report: {e}")
         flash('Error generating profit loss report', 'danger')
         return redirect(url_for('dashboard'))
+    
+    
+@app.route('/bank/accounts')
+@login_required(roles=['manager', 'admin'])
+def manage_bank_accounts():
+    """View all bank accounts"""
+    bank_accounts = BankAccount.query.order_by(BankAccount.is_primary.desc(), BankAccount.bank_name).all()
+    return render_template('bank/accounts.html', bank_accounts=bank_accounts)
+
+@app.route('/bank/accounts/add', methods=['GET', 'POST'])
+@login_required(roles=['manager', 'admin'])
+def add_bank_account():
+    """Add a new bank account"""
+    if request.method == 'POST':
+        try:
+            bank_account = BankAccount(
+                account_name=request.form['account_name'],
+                account_number=request.form['account_number'],
+                bank_name=request.form['bank_name'],
+                branch_code=request.form.get('branch_code'),
+                account_type=request.form.get('account_type', 'checking'),
+                currency=request.form.get('currency', 'KES'),
+                is_primary=request.form.get('is_primary') == 'on'
+            )
+            
+            # If setting as primary, unset others
+            if bank_account.is_primary:
+                BankAccount.query.update({'is_primary': False})
+            
+            db.session.add(bank_account)
+            db.session.commit()
+            
+            flash('Bank account added successfully!', 'success')
+            return redirect(url_for('manage_bank_accounts'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding bank account: {str(e)}', 'danger')
+    
+    return render_template('bank/add_account.html')
+
+# ======================
+# PAYMENT GATEWAY INTEGRATION
+# ======================
+
+@app.route('/payment/gateways')
+@login_required(roles=['admin'])
+def manage_payment_gateways():
+    """Manage payment gateway configurations"""
+    gateways = PaymentGateway.query.all()
+    return render_template('payment/gateways.html', gateways=gateways)
+
+@app.route('/payment/gateways/add', methods=['GET', 'POST'])
+@login_required(roles=['admin'])
+def add_payment_gateway():
+    """Add a new payment gateway"""
+    if request.method == 'POST':
+        try:
+            gateway = PaymentGateway(
+                name=request.form['name'],
+                gateway_type=request.form['gateway_type'],
+                api_key=request.form['api_key'],
+                api_secret=request.form.get('api_secret', ''),
+                webhook_secret=request.form.get('webhook_secret', ''),
+                merchant_id=request.form.get('merchant_id', ''),
+                is_active=request.form.get('is_active') == 'on',
+                test_mode=request.form.get('test_mode') == 'on'
+            )
+            
+            db.session.add(gateway)
+            db.session.commit()
+            
+            flash('Payment gateway added successfully!', 'success')
+            return redirect(url_for('manage_payment_gateways'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding payment gateway: {str(e)}', 'danger')
+    
+    return render_template('payment/add_gateway.html')
+
+@app.route('/api/payment/process', methods=['POST'])
+@login_required(roles=['cashier', 'manager', 'admin'])
+def process_payment():
+    """Process a payment via selected gateway"""
+    try:
+        data = request.get_json()
+        amount = float(data['amount'])
+        gateway_name = data.get('gateway', 'stripe')
+        sale_id = data.get('sale_id')
+        
+        # Get customer info from sale or request
+        sale = None
+        if sale_id:
+            sale = Sale.query.get(sale_id)
+        
+        # Initialize payment processor
+        from bank_integration import PaymentProcessor
+        processor = PaymentProcessor(gateway_name)
+        
+        # Process payment
+        result = processor.process_payment(
+            amount=amount,
+            currency=data.get('currency', 'KES'),
+            customer_email=data.get('customer_email', 'customer@example.com'),
+            description=data.get('description', 'Sales Payment'),
+            metadata={
+                'sale_id': sale_id,
+                'user_id': session['user_id'],
+                'location_id': session.get('location_id')
+            }
+        )
+        
+        if result['success']:
+            # Create bank transaction record
+            transaction = BankTransaction(
+                transaction_ref=result.get('payment_intent_id') or result.get('order_id') or f"TXN-{datetime.now().timestamp()}",
+                amount=amount,
+                transaction_type='deposit',
+                description='Sales payment',
+                status='pending',
+                payment_method=gateway_name,
+                gateway_id=processor.gateway.id,
+                sale_id=sale_id,
+                transaction_date=datetime.utcnow(),
+                transaction_data=result
+            )
+            
+            db.session.add(transaction)
+            
+            # Update sale payment status if applicable
+            if sale:
+                sale.payment_status = 'processing'
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'transaction_id': transaction.id,
+                'gateway_response': result
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 400
+            
+    except Exception as e:
+        app.logger.error(f"Payment processing error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/payment/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    """Handle Stripe webhook events"""
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    try:
+        # Get Stripe gateway
+        gateway = PaymentGateway.query.filter_by(name='stripe', is_active=True).first()
+        if not gateway:
+            return jsonify({'error': 'Stripe gateway not configured'}), 400
+        
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, gateway.webhook_secret
+        )
+        
+        # Handle different event types
+        if event['type'] == 'payment_intent.succeeded':
+            payment_intent = event['data']['object']
+            transaction_ref = payment_intent['id']
+            
+            # Update transaction status
+            transaction = BankTransaction.query.filter_by(transaction_ref=transaction_ref).first()
+            if transaction:
+                transaction.status = 'completed'
+                transaction.posted_date = datetime.utcnow()
+                
+                # Update sale status
+                if transaction.sale:
+                    transaction.sale.payment_status = 'completed'
+                
+                db.session.commit()
+                
+                app.logger.info(f"Payment {transaction_ref} marked as completed")
+        
+        elif event['type'] == 'payment_intent.payment_failed':
+            payment_intent = event['data']['object']
+            transaction_ref = payment_intent['id']
+            
+            transaction = BankTransaction.query.filter_by(transaction_ref=transaction_ref).first()
+            if transaction:
+                transaction.status = 'failed'
+                db.session.commit()
+        
+        return jsonify({'status': 'success'}), 200
+        
+    except ValueError as e:
+        return jsonify({'error': 'Invalid payload'}), 400
+    except stripe.error.SignatureVerificationError as e:
+        return jsonify({'error': 'Invalid signature'}), 400
+    except Exception as e:
+        app.logger.error(f"Webhook error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ======================
+# BANK API INTEGRATION (PLAID)
+# ======================
+
+@app.route('/bank/api/connect', methods=['GET'])
+@login_required(roles=['manager', 'admin'])
+def connect_bank_api():
+    """Simplified bank connection route using direct API"""
+    print(f"🚀 Connecting bank for user: {session['user_id']}")
+    
+    try:
+        from bank_integration import SimpleBankAPIProcessor
+        
+        processor = SimpleBankAPIProcessor(connection_type='plaid')
+        result = processor.create_link_token(session['user_id'])
+        
+        if result['success']:
+            print(f"✅ Link token generated, rendering template")
+            return render_template('bank/connect.html', 
+                                 link_token=result['link_token'],
+                                 plaid_environment='sandbox')
+        else:
+            # Show detailed error
+            error_msg = result['error']
+            print(f"❌ Plaid error: {error_msg}")
+            
+            # Check if it's an authentication error
+            if "401" in error_msg or "invalid_client" in error_msg.lower():
+                flash("Invalid Plaid credentials. Using demo mode.", 'warning')
+                return render_template('bank/connect_demo.html')
+            else:
+                flash(f"Plaid Error: {error_msg}", 'danger')
+                return redirect(url_for('dashboard'))
+            
+    except Exception as e:
+        print(f"❌ System error: {e}")
+        flash(f"System error: {str(e)[:100]}", 'danger')
+        return redirect(url_for('dashboard'))
+@app.route('/api/bank/exchange_token', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def exchange_bank_token():
+    """Exchange public token for access token"""
+    try:
+        data = request.get_json()
+        public_token = data['public_token']
+        
+        from bank_integration import BankAPIProcessor
+        processor = BankAPIProcessor(connection_type='plaid')
+        result = processor.exchange_public_token(public_token)
+        
+        if result['success']:
+            # Save connection
+            connection = BankAPIConnection(
+                bank_name=data.get('institution_name', 'Unknown Bank'),
+                institution_id=data.get('institution_id'),
+                access_token=result['access_token'],
+                item_id=result['item_id'],
+                connection_type='plaid',
+                is_active=True
+            )
+            
+            db.session.add(connection)
+            db.session.commit()
+            
+            # Get account info
+            accounts_result = processor.get_accounts(result['access_token'])
+            
+            return jsonify({
+                'success': True,
+                'connection_id': connection.id,
+                'accounts': accounts_result.get('accounts', []) if accounts_result['success'] else []
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 400
+            
+    except Exception as e:
+        app.logger.error(f"Token exchange error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/bank/api/transactions')
+@login_required(roles=['manager', 'admin'])
+def get_bank_transactions():
+    """Fetch and display bank transactions"""
+    connection_id = request.args.get('connection_id')
+    days = int(request.args.get('days', 30))
+    
+    connection = BankAPIConnection.query.get(connection_id)
+    if not connection:
+        flash('Bank connection not found', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    from bank_integration import BankAPIProcessor
+    processor = BankAPIProcessor(connection_type=connection.connection_type)
+    
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    result = processor.get_transactions(
+        connection.access_token,
+        start_date,
+        end_date
+    )
+    
+    if result['success']:
+        transactions = result['transactions']
+        
+        # Try to auto-match with system records
+        matched_transactions = []
+        for txn in transactions:
+            matched = BankTransaction.query.filter(
+                db.or_(
+                    BankTransaction.transaction_ref == txn.get('transaction_id'),
+                    db.and_(
+                        BankTransaction.amount == txn['amount'],
+                        BankTransaction.transaction_date.date() == datetime.strptime(txn['date'], '%Y-%m-%d').date()
+                    )
+                )
+            ).first()
+            
+            matched_transactions.append({
+                'bank_data': txn,
+                'matched_system_record': matched
+            })
+        
+        connection.last_synced = datetime.utcnow()
+        db.session.commit()
+        
+        return render_template('bank/transactions.html',
+                             transactions=matched_transactions,
+                             connection=connection,
+                             total=result['total_transactions'])
+    else:
+        flash(f"Error fetching transactions: {result['error']}", 'danger')
+        return redirect(url_for('dashboard'))
+
+@app.route('/api/bank/reconcile', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def reconcile_transaction():
+    """Manually reconcile a bank transaction with system record"""
+    try:
+        data = request.get_json()
+        transaction_id = data['transaction_id']
+        system_record_id = data.get('system_record_id')
+        
+        if system_record_id:
+            # Link to existing system record
+            bank_txn = BankTransaction.query.get(system_record_id)
+            if bank_txn:
+                bank_txn.status = 'reconciled'
+                bank_txn.posted_date = datetime.utcnow()
+                db.session.commit()
+        else:
+            # Create new system record from bank transaction
+            bank_txn = BankTransaction(
+                transaction_ref=f"BANK-{transaction_id}",
+                amount=data['amount'],
+                transaction_type='deposit' if data['amount'] > 0 else 'withdrawal',
+                description=data['description'],
+                status='reconciled',
+                transaction_date=datetime.strptime(data['date'], '%Y-%m-%d'),
+                posted_date=datetime.utcnow(),
+                transaction_data={'bank_reconciled': True, 'original_data': data}
+            )
+            db.session.add(bank_txn)
+            db.session.commit()
+        
+        return jsonify({'success': True, 'transaction_id': bank_txn.id})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+# ======================
+# ENHANCED POS WITH PAYMENT OPTIONS
+# ======================
+
+@app.route('/pos_advanced')
+@login_required(roles=['cashier', 'manager', 'admin'])
+def pos_advanced():
+    """POS with integrated payment options"""
+    payment_gateways = PaymentGateway.query.filter_by(is_active=True).all()
+    bank_accounts = BankAccount.query.filter_by(is_active=True).all()
+    
+    return render_template('pos_advanced.html',
+                         payment_gateways=payment_gateways,
+                         bank_accounts=bank_accounts)
+
+@app.route('/api/sale/create_with_payment', methods=['POST'])
+@login_required(roles=['cashier', 'manager', 'admin'])
+def create_sale_with_payment():
+    """Create sale with integrated payment processing"""
+    try:
+        data = request.get_json()
+        items = data.get('items', [])
+        payment_method = data.get('payment_method', 'cash')
+        gateway_name = data.get('gateway')
+        
+        if not items:
+            return jsonify({'error': 'No items in cart.'}), 400
+        
+        # Calculate totals
+        subtotal = 0
+        tax = 0
+        for item in items:
+            product = Product.query.get(item['id'])
+            if not product or product.current_stock < item['quantity']:
+                return jsonify({'error': f"Insufficient stock for {product.name}. Only {product.current_stock} left."}), 400
+            
+            item_total = product.selling_price * item['quantity']
+            subtotal += item_total
+            if product.vatable and product.tax_rate:
+                tax += item_total * product.tax_rate
+        
+        total = subtotal + tax
+        
+        # Create sale record
+        sale = Sale(
+            receipt_number=Sale.generate_receipt_number(),
+            user_id=session['user_id'],
+            subtotal=subtotal,
+            tax_amount=tax,
+            total_amount=total,
+            payment_method=payment_method,
+            channel='offline',
+            split_payment=False,
+            location_id=session.get('location_id')
+        )
+        db.session.add(sale)
+        db.session.commit()
+        
+        # Add sale items and update inventory
+        for item in items:
+            product = Product.query.get(item['id'])
+            if product:
+                sale_item = SaleItem(
+                    sale_id=sale.id,
+                    product_id=product.id,
+                    quantity=item['quantity'],
+                    unit_price=item['price'],
+                    total_price=item['price'] * item['quantity']
+                )
+                db.session.add(sale_item)
+                
+                product.current_stock -= item['quantity']
+                
+                movement = InventoryMovement(
+                    product_id=product.id,
+                    movement_type='sale',
+                    quantity=-item['quantity'],
+                    reference_id=sale.id
+                )
+                db.session.add(movement)
+        
+        # Process payment if electronic
+        payment_result = None
+        if gateway_name and gateway_name != 'cash':
+            from bank_integration import PaymentProcessor
+            
+            try:
+                processor = PaymentProcessor(gateway_name)
+                payment_result = processor.process_payment(
+                    amount=total,
+                    currency='KES',
+                    customer_email=data.get('customer_email', ''),
+                    description=f'Sale #{sale.receipt_number}',
+                    metadata={
+                        'sale_id': sale.id,
+                        'receipt_number': sale.receipt_number
+                    }
+                )
+                
+                if payment_result['success']:
+                    # Create bank transaction
+                    bank_txn = BankTransaction(
+                        transaction_ref=payment_result.get('payment_intent_id') or payment_result.get('order_id'),
+                        amount=total,
+                        transaction_type='deposit',
+                        description=f'Sale #{sale.receipt_number}',
+                        status='pending',
+                        payment_method=gateway_name,
+                        sale_id=sale.id,
+                        transaction_date=datetime.utcnow(),
+                        metadata=payment_result
+                    )
+                    db.session.add(bank_txn)
+                    sale.payment_status = 'processing'
+                else:
+                    sale.payment_status = 'failed'
+                    sale.notes = f'Payment failed: {payment_result.get("error")}'
+                    
+            except Exception as e:
+                app.logger.error(f"Payment processing error: {e}")
+                sale.payment_status = 'failed'
+                sale.notes = f'Payment processing error: {str(e)}'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'receipt_number': sale.receipt_number,
+            'sale_id': sale.id,
+            'payment_result': payment_result
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error creating sale with payment: {e}")
+        return jsonify({'error': 'An internal error occurred.'}), 500
+
+# ======================
+# FINANCIAL REPORTS WITH BANK DATA
+# ======================
+
+@app.route('/admin/reports/bank_reconciliation')
+@login_required(roles=['manager', 'admin'])
+def bank_reconciliation_report():
+    """Bank reconciliation report"""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if start_date:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d')
+    else:
+        start_date = datetime.now() - timedelta(days=30)
+    
+    if end_date:
+        end_date = datetime.strptime(end_date, '%Y-%m-%d')
+    else:
+        end_date = datetime.now()
+    
+    # System transactions
+    system_transactions = BankTransaction.query.filter(
+        BankTransaction.transaction_date.between(start_date, end_date)
+    ).order_by(BankTransaction.transaction_date.desc()).all()
+    
+    # Bank API connections
+    connections = BankAPIConnection.query.filter_by(is_active=True).all()
+    
+    # Totals
+    total_deposits = db.session.query(func.sum(BankTransaction.amount)).filter(
+        BankTransaction.transaction_type == 'deposit',
+        BankTransaction.status == 'completed',
+        BankTransaction.transaction_date.between(start_date, end_date)
+    ).scalar() or 0
+    
+    total_withdrawals = db.session.query(func.sum(BankTransaction.amount)).filter(
+        BankTransaction.transaction_type == 'withdrawal',
+        BankTransaction.status == 'completed',
+        BankTransaction.transaction_date.between(start_date, end_date)
+    ).scalar() or 0
+    
+    unreconciled = BankTransaction.query.filter(
+        BankTransaction.status != 'reconciled',
+        BankTransaction.transaction_date.between(start_date, end_date)
+    ).count()
+    
+    return render_template('reports/bank_reconciliation.html',
+                         system_transactions=system_transactions,
+                         connections=connections,
+                         total_deposits=total_deposits,
+                         total_withdrawals=total_withdrawals,
+                         unreconciled=unreconciled,
+                         start_date=start_date.strftime('%Y-%m-%d'),
+                         end_date=end_date.strftime('%Y-%m-%d'))
+
+# ======================
+# BULK PAYMENT PROCESSING
+# ======================
+
+@app.route('/bank/payments/bulk', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def process_bulk_payments():
+    """Process bulk payments to suppliers/expenses"""
+    try:
+        data = request.get_json()
+        payment_ids = data.get('payment_ids', [])  # Could be expense_ids, supplier_invoice_ids
+        bank_account_id = data['bank_account_id']
+        payment_method = data.get('payment_method', 'bank_transfer')
+        
+        bank_account = BankAccount.query.get(bank_account_id)
+        if not bank_account:
+            return jsonify({'error': 'Bank account not found'}), 400
+        
+        total_amount = 0
+        processed_payments = []
+        
+        # Process each payment
+        for payment_id in payment_ids:
+            # This would fetch the actual payable amount
+            # For now, using placeholder logic
+            amount = 1000  # Would be fetched from expense/supplier record
+            
+            # Create withdrawal transaction
+            transaction = BankTransaction(
+                transaction_ref=f"BULK-{datetime.now().strftime('%Y%m%d%H%M%S')}-{payment_id}",
+                bank_account_id=bank_account_id,
+                amount=-amount,  # Negative for withdrawal
+                transaction_type='withdrawal',
+                description=f'Bulk payment for ID: {payment_id}',
+                status='pending',
+                payment_method=payment_method,
+                transaction_date=datetime.utcnow()
+            )
+            
+            db.session.add(transaction)
+            total_amount += amount
+            processed_payments.append({
+                'payment_id': payment_id,
+                'amount': amount,
+                'transaction_id': transaction.id
+            })
+        
+        # In real implementation, you would:
+        # 1. Generate payment file (ACH, SEPA, SWIFT)
+        # 2. Send to bank via API
+        # 3. Update status based on response
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Processed {len(processed_payments)} payments totaling {total_amount:.2f}',
+            'total_amount': total_amount,
+            'processed_payments': processed_payments
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500   
+    
+# ======================
+# MOCK BANK INTEGRATION
+# ======================
+
+@app.route('/bank/connect', methods=['GET'])
+@login_required(roles=['manager', 'admin'])
+def mock_bank_connect():
+    """Mock bank connection page"""
+    try:
+        from mock_bank import MockBankAPI
+        banks = MockBankAPI.get_bank_list()
+        return render_template('bank/mock_connect.html', 
+                             banks=banks,
+                             title="Connect Bank Account")
+    except ImportError:
+        flash('Mock bank module not found', 'warning')
+        return redirect(url_for('dashboard'))
+
+@app.route('/api/bank/connect', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def api_mock_bank_connect():
+    """API to connect mock bank"""
+    try:
+        data = request.get_json()
+        bank_id = data.get('bank_id')
+        account_number = data.get('account_number')
+        
+        if not bank_id or not account_number:
+            return jsonify({'success': False, 'error': 'Bank and account number required'})
+        
+        if len(str(account_number).strip()) < 3:
+            return jsonify({'success': False, 'error': 'Account number too short'})
+        
+        from mock_bank import MockBankAPI
+        result = MockBankAPI.connect_bank(bank_id, account_number)
+        
+        # Save to database
+        from models import BankAPIConnection
+        connection = BankAPIConnection(
+            bank_name=result['bank_name'],
+            account_number=result['account_number'],
+            connection_type='mock',
+            connection_data=result,
+            is_active=True,
+            user_id=session['user_id']
+        )
+        db.session.add(connection)
+        db.session.commit()
+        
+        result['db_id'] = connection.id
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error connecting bank: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/bank/transactions/<int:connection_id>')
+@login_required(roles=['manager', 'admin'])
+def mock_bank_transactions(connection_id):
+    """View mock transactions"""
+    from models import BankAPIConnection
+    
+    connection = BankAPIConnection.query.get_or_404(connection_id)
+    
+    # Verify ownership
+    if connection.user_id != session['user_id'] and session['role'] not in ['admin', 'manager']:
+        flash('Access denied', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    from mock_bank import MockBankAPI
+    transactions = MockBankAPI.get_transactions(f"mock_{connection_id}")
+    summary = MockBankAPI.get_account_summary(f"mock_{connection_id}")
+    
+    return render_template('bank/mock_transactions.html',
+                         connection=connection,
+                         transactions=transactions['transactions'],
+                         summary=summary['summary'],
+                         stats=summary['stats'])
+
+@app.route('/api/bank/transactions/<int:connection_id>')
+@login_required(roles=['manager', 'admin'])
+def api_mock_transactions(connection_id):
+    """API to get mock transactions"""
+    from mock_bank import MockBankAPI
+    days = request.args.get('days', 30, type=int)
+    
+    result = MockBankAPI.get_transactions(f"mock_{connection_id}", days)
+    return jsonify(result)
+
+@app.route('/bank/connections')
+@login_required(roles=['manager', 'admin'])
+def list_bank_connections():
+    """List all bank connections"""
+    from models import BankAPIConnection
+    
+    if session['role'] in ['admin', 'manager']:
+        connections = BankAPIConnection.query.filter_by(is_active=True).all()
+    else:
+        connections = BankAPIConnection.query.filter_by(
+            user_id=session['user_id'], 
+            is_active=True
+        ).all()
+    
+    return render_template('bank/connections.html', connections=connections)
+
+@app.route('/bank/disconnect/<int:connection_id>', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def disconnect_bank(connection_id):
+    """Disconnect a bank account"""
+    from models import BankAPIConnection
+    
+    connection = BankAPIConnection.query.get_or_404(connection_id)
+    
+    # Verify ownership
+    if connection.user_id != session['user_id'] and session['role'] not in ['admin', 'manager']:
+        flash('Access denied', 'danger')
+        return redirect(url_for('list_bank_connections'))
+    
+    connection.is_active = False
+    db.session.commit()
+    
+    flash(f'Disconnected from {connection.bank_name}', 'success')
+    return redirect(url_for('list_bank_connections'))
 if __name__ == '__main__':
     app.run(debug=True)

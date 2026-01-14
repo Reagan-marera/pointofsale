@@ -1,0 +1,476 @@
+{% extends "layouts/base.html" %}
+{% block title %}Advanced POS{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Product Selection -->
+        <div class="col-md-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Products</h5>
+                </div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="productSearch" 
+                               placeholder="Scan barcode or search product...">
+                        <button class="btn btn-primary" type="button" onclick="searchProduct()">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </div>
+                    
+                    <div id="searchResults" class="mb-3"></div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="cartTable">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Price</th>
+                                    <th>Qty</th>
+                                    <th>Total</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartItems">
+                                <!-- Cart items will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Payment Panel -->
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Payment Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6>Subtotal: <span id="subtotal" class="float-end">0.00</span></h6>
+                        <h6>Tax: <span id="tax" class="float-end">0.00</span></h6>
+                        <hr>
+                        <h4>Total: <span id="total" class="float-end text-primary">0.00</span></h4>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Customer Email (for receipt)</label>
+                        <input type="email" class="form-control" id="customerEmail" 
+                               placeholder="customer@example.com">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <select class="form-select" id="paymentMethod" onchange="togglePaymentOptions()">
+                            <option value="cash">Cash</option>
+                            <option value="card">Credit/Debit Card</option>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="split">Split Payment</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Payment Gateway Selection -->
+                    <div class="mb-3" id="gatewaySection" style="display: none;">
+                        <label class="form-label">Payment Gateway</label>
+                        <select class="form-select" id="paymentGateway">
+                            {% for gateway in payment_gateways %}
+                            {% if gateway.is_active %}
+                            <option value="{{ gateway.name }}">{{ gateway.name|capitalize }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Bank Account Selection -->
+                    <div class="mb-3" id="bankAccountSection" style="display: none;">
+                        <label class="form-label">Bank Account</label>
+                        <select class="form-select" id="bankAccount">
+                            {% for account in bank_accounts %}
+                            <option value="{{ account.id }}">{{ account.bank_name }} - {{ account.account_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Split Payment Section -->
+                    <div class="mb-3" id="splitPaymentSection" style="display: none;">
+                        <label class="form-label">Split Payment</label>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">Cash</span>
+                            <input type="number" class="form-control" id="cashAmount" placeholder="Amount">
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text">Card</span>
+                            <input type="number" class="form-control" id="cardAmount" placeholder="Amount">
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success btn-lg" onclick="processPayment()">
+                            <i class="bi bi-credit-card"></i> Process Payment
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="clearCart()">
+                            <i class="bi bi-x-circle"></i> Clear Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payment Status -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Payment Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="paymentStatus">
+                        <div class="text-center text-muted">
+                            <i class="bi bi-credit-card fs-1"></i>
+                            <p class="mt-2">Awaiting payment</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let cart = [];
+let cartTotal = 0;
+
+// Handle barcode scanning
+document.getElementById('productSearch').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchProduct();
+    }
+});
+
+function searchProduct() {
+    const query = document.getElementById('productSearch').value.trim();
+    if (!query) return;
+    
+    fetch(`/api/products/search?q=${encodeURIComponent(query)}`)
+    .then(response => response.json())
+    .then(products => {
+        const resultsDiv = document.getElementById('searchResults');
+        if (products.length > 0) {
+            let html = '<div class="list-group">';
+            products.forEach(product => {
+                html += `
+                    <a href="#" class="list-group-item list-group-item-action" 
+                       onclick="addToCart(${product.id}, '${product.name}', ${product.price})">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${product.name}</h6>
+                            <small>KES ${product.price.toFixed(2)}</small>
+                        </div>
+                        <small class="text-muted">Stock: ${product.stock} | Barcode: ${product.barcode}</small>
+                    </a>
+                `;
+            });
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        } else {
+            resultsDiv.innerHTML = '<div class="alert alert-warning">No products found</div>';
+        }
+    });
+}
+
+function addToCart(productId, productName, price) {
+    const existingItem = cart.find(item => item.id === productId);
+    
+    if (existingItem) {
+        existingItem.quantity += 1;
+    } else {
+        cart.push({
+            id: productId,
+            name: productName,
+            price: price,
+            quantity: 1
+        });
+    }
+    
+    updateCartDisplay();
+    document.getElementById('productSearch').value = '';
+    document.getElementById('searchResults').innerHTML = '';
+}
+
+function updateCartDisplay() {
+    const cartBody = document.getElementById('cartItems');
+    let subtotal = 0;
+    let tax = 0;
+    
+    cartBody.innerHTML = '';
+    
+    cart.forEach((item, index) => {
+        const itemTotal = item.price * item.quantity;
+        subtotal += itemTotal;
+        tax += itemTotal * 0.16; // Assuming 16% VAT
+        
+        cartBody.innerHTML += `
+            <tr>
+                <td>${item.name}</td>
+                <td>${item.price.toFixed(2)}</td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary" type="button" 
+                                onclick="updateQuantity(${index}, -1)">-</button>
+                        <input type="text" class="form-control text-center" 
+                               value="${item.quantity}" readonly style="width: 50px;">
+                        <button class="btn btn-outline-secondary" type="button" 
+                                onclick="updateQuantity(${index}, 1)">+</button>
+                    </div>
+                </td>
+                <td>${itemTotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    const total = subtotal + tax;
+    cartTotal = total;
+    
+    document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+    document.getElementById('tax').textContent = tax.toFixed(2);
+    document.getElementById('total').textContent = total.toFixed(2);
+}
+
+function updateQuantity(index, change) {
+    cart[index].quantity += change;
+    if (cart[index].quantity <= 0) {
+        cart.splice(index, 1);
+    }
+    updateCartDisplay();
+}
+
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    updateCartDisplay();
+}
+
+function clearCart() {
+    cart = [];
+    updateCartDisplay();
+}
+
+function togglePaymentOptions() {
+    const method = document.getElementById('paymentMethod').value;
+    const gatewaySection = document.getElementById('gatewaySection');
+    const bankSection = document.getElementById('bankAccountSection');
+    const splitSection = document.getElementById('splitPaymentSection');
+    
+    gatewaySection.style.display = ['card', 'mobile_money'].includes(method) ? 'block' : 'none';
+    bankSection.style.display = method === 'bank_transfer' ? 'block' : 'none';
+    splitSection.style.display = method === 'split' ? 'block' : 'none';
+}
+
+function processPayment() {
+    if (cart.length === 0) {
+        showNotification('Cart is empty!', 'warning');
+        return;
+    }
+    
+    const paymentMethod = document.getElementById('paymentMethod').value;
+    const customerEmail = document.getElementById('customerEmail').value;
+    const gateway = document.getElementById('paymentGateway').value;
+    
+    showPaymentStatus('Processing payment...', 'info');
+    
+    // For electronic payments
+    if (['card', 'mobile_money'].includes(paymentMethod)) {
+        processElectronicPayment(paymentMethod, gateway, customerEmail);
+    } 
+    // For bank transfers
+    else if (paymentMethod === 'bank_transfer') {
+        processBankTransfer(customerEmail);
+    }
+    // For cash
+    else {
+        processCashPayment(customerEmail);
+    }
+}
+
+function processElectronicPayment(method, gateway, email) {
+    fetch('/api/sale/create_with_payment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            items: cart,
+            payment_method: method,
+            gateway: gateway,
+            customer_email: email
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.payment_result && data.payment_result.client_secret) {
+                // Handle Stripe payment
+                handleStripePayment(data.payment_result.client_secret, data.receipt_number);
+            } else if (data.payment_result && data.payment_result.links) {
+                // Handle PayPal payment
+                handlePayPalPayment(data.payment_result.links, data.receipt_number);
+            } else {
+                showPaymentStatus('Payment successful!', 'success');
+                printReceipt(data.receipt_number);
+            }
+        } else {
+            showPaymentStatus(`Error: ${data.error}`, 'danger');
+        }
+    })
+    .catch(error => {
+        showPaymentStatus('Network error occurred', 'danger');
+    });
+}
+
+function handleStripePayment(clientSecret, receiptNumber) {
+    // Initialize Stripe Elements (would require Stripe.js)
+    showPaymentStatus('Redirecting to Stripe...', 'info');
+    // In production, you would use Stripe.js Elements
+    alert(`Stripe Payment: ${receiptNumber}\nClient Secret: ${clientSecret}`);
+}
+
+function handlePayPalPayment(links, receiptNumber) {
+    // Find approval link
+    const approvalLink = links.find(link => link.rel === 'approve');
+    if (approvalLink) {
+        showPaymentStatus('Redirecting to PayPal...', 'info');
+        window.open(approvalLink.href, '_blank');
+    }
+}
+
+function processBankTransfer(email) {
+    const bankAccountId = document.getElementById('bankAccount').value;
+    
+    fetch('/api/sale/create_with_payment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            items: cart,
+            payment_method: 'bank_transfer',
+            customer_email: email,
+            bank_account_id: bankAccountId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showPaymentStatus('Bank transfer initiated!', 'success');
+            printReceipt(data.receipt_number);
+            showBankDetails(data.bank_details);
+        } else {
+            showPaymentStatus(`Error: ${data.error}`, 'danger');
+        }
+    });
+}
+
+function processCashPayment(email) {
+    fetch('/api/sale/create_with_payment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            items: cart,
+            payment_method: 'cash',
+            customer_email: email
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showPaymentStatus('Cash payment recorded!', 'success');
+            printReceipt(data.receipt_number);
+        } else {
+            showPaymentStatus(`Error: ${data.error}`, 'danger');
+        }
+    });
+}
+
+function showPaymentStatus(message, type) {
+    const statusDiv = document.getElementById('paymentStatus');
+    const icon = type === 'success' ? 'bi-check-circle' : 
+                 type === 'danger' ? 'bi-x-circle' : 
+                 type === 'info' ? 'bi-info-circle' : 'bi-credit-card';
+    
+    statusDiv.innerHTML = `
+        <div class="alert alert-${type} text-center">
+            <i class="bi ${icon} fs-1"></i>
+            <h5 class="mt-2">${message}</h5>
+        </div>
+    `;
+}
+
+function showBankDetails(details) {
+    const modalHtml = `
+        <div class="modal fade" id="bankDetailsModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Bank Transfer Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <h6>Please transfer the exact amount to:</h6>
+                            <p class="mb-1"><strong>Bank:</strong> ${details.bank_name}</p>
+                            <p class="mb-1"><strong>Account Name:</strong> ${details.account_name}</p>
+                            <p class="mb-1"><strong>Account Number:</strong> ${details.account_number}</p>
+                            <p class="mb-1"><strong>Amount:</strong> KES ${cartTotal.toFixed(2)}</p>
+                            <p class="mb-0"><strong>Reference:</strong> ${details.reference}</p>
+                        </div>
+                        <p class="text-muted">
+                            Your order will be confirmed once payment is received.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('bankDetailsModal'));
+    modal.show();
+}
+
+function printReceipt(receiptNumber) {
+    window.open(`/receipt/print/${receiptNumber}`, '_blank');
+    clearCart();
+}
+
+function showNotification(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+    alertDiv.style.zIndex = '1050';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+// Initialize
+togglePaymentOptions();
+</script>
+
+<style>
+#cartTable th, #cartTable td {
+    vertical-align: middle;
+}
+.input-group {
+    width: auto;
+}
+</style>
+{% endblock %}

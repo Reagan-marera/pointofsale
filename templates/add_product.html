@@ -86,10 +86,6 @@
                                 <label class="form-check-label" for="vatable">VAT applicable</label>
                             </div>
                         </div>
-                        
-                        </div>
-                        
-                        </div>
                     </div>
                 </div>
             </div>
@@ -145,7 +141,7 @@
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> Point the camera at the barcode to scan
                 </div>
-                
+
                 <div id="scanner-container" class="text-center">
                     <div id="interactive" class="viewport mb-3"></div>
                     <div class="scanner-overlay">
@@ -168,9 +164,44 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Tom Select CSS & JS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css"/>
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<!-- Quagga for barcode scanning -->
 <script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Tom Select for searchable dropdowns
+    new TomSelect("#name", {
+        create: false,
+        sortField: {
+            field: "text",
+            direction: "asc"
+        }
+    });
+    new TomSelect("#category", {
+        create: false,
+        sortField: {
+            field: "text",
+            direction: "asc"
+        }
+    });
+    new TomSelect("#supplier_id", {
+        create: false,
+        sortField: {
+            field: "text",
+            direction: "asc"
+        }
+    });
+    new TomSelect("#dealer_id", {
+        create: false,
+        sortField: {
+            field: "text",
+            direction: "asc"
+        }
+    });
+
+    // Barcode Scanner Logic
     const barcodeScannerModal = new bootstrap.Modal(document.getElementById('barcodeScannerModal'));
     let scannerActive = false;
     let scannerInitialized = false;
@@ -256,8 +287,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (result) {
                 if (result.boxes) {
-                    drawingCtx.clearRect(0, 0, 
-                        parseInt(drawingCanvas.getAttribute("width")), 
+                    drawingCtx.clearRect(0, 0,
+                        parseInt(drawingCanvas.getAttribute("width")),
                         parseInt(drawingCanvas.getAttribute("height")));
                     result.boxes.filter(function(box) {
                         return box !== result.box;
@@ -279,15 +310,15 @@ document.addEventListener('DOMContentLoaded', function() {
         Quagga.onDetected(function(result) {
             const code = result.codeResult.code;
             console.log("Barcode detected:", code);
-            
+
             // Prevent duplicate scans of the same code
             if (code === lastScannedCode) {
                 return;
             }
-            
+
             lastScannedCode = code;
             processScannedBarcode(code);
-            
+
             // Add slight delay before closing to give user feedback
             scanTimeout = setTimeout(() => {
                 stopScanner();
@@ -299,8 +330,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function processScannedBarcode(barcode) {
         document.getElementById('barcode').value = barcode;
         document.getElementById('manual-barcode-input').value = barcode;
-        
-        // Optional: Auto-focus on next field for better UX
         document.getElementById('name').focus();
     }
 
@@ -325,15 +354,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Validate selling price is higher than buying price
         const buyingPrice = parseFloat(document.getElementById('buying_price').value);
         const sellingPrice = parseFloat(document.getElementById('selling_price').value);
-        
+
         if (sellingPrice <= buyingPrice) {
             e.preventDefault();
             alert('Selling price must be higher than buying price');
             document.getElementById('selling_price').focus();
         }
-        
+
         // Validate barcode is unique (you would typically do this server-side)
-        // This is just a client-side example
         const barcode = document.getElementById('barcode').value.trim();
         if (barcode.length < 8) {
             e.preventDefault();

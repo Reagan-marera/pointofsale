@@ -1,0 +1,111 @@
+{% extends "layouts/base.html" %}
+{% block title %}Bank Transactions - {{ connection.bank_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">
+            <i class="bi bi-bank"></i> {{ connection.bank_name }}
+        </h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="{{ url_for('list_bank_connections') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Connections
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Account Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center border-end">
+                            <h6 class="text-muted">Current Balance</h6>
+                            <h3 class="text-success">KES {{ "%.2f"|format(summary.current_balance) }}</h3>
+                        </div>
+                        <div class="col-md-4 text-center border-end">
+                            <h6 class="text-muted">Available Balance</h6>
+                            <h3 class="text-primary">KES {{ "%.2f"|format(summary.available_balance) }}</h3>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h6 class="text-muted">Account Status</h6>
+                            <span class="badge bg-success fs-6">{{ summary.account_status }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Account Details</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Account Number:</strong> {{ connection.account_number }}</p>
+                    <p><strong>Account Type:</strong> 
+                        {{ connection.connection_data.get('account_type', 'Current') if connection.connection_data else 'Current' }}
+                    </p>
+                    <p><strong>Currency:</strong> {{ summary.currency }}</p>
+                    <p><strong>Last Updated:</strong> {{ summary.last_updated[:10] }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Recent Transactions</h5>
+            <div>
+                <span class="badge bg-info">Last 30 Days</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th class="text-end">Amount (KES)</th>
+                            <th class="text-end">Balance</th>
+                            <th>Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for txn in transactions %}
+                        <tr>
+                            <td>{{ txn.date }}</td>
+                            <td>
+                                <div>{{ txn.description }}</div>
+                                <small class="text-muted">{{ txn.time }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if txn.type == 'deposit' else 'warning' }}">
+                                    {{ txn.category }}
+                                </span>
+                            </td>
+                            <td class="text-end {{ 'text-success' if txn.amount > 0 else 'text-danger' }}">
+                                {{ "%+.2f"|format(txn.amount) }}
+                            </td>
+                            <td class="text-end">{{ "%.2f"|format(txn.balance) }}</td>
+                            <td><code>{{ txn.reference }}</code></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="bi bi-info-circle"></i> 
+                Showing {{ transactions|length }} most recent transactions. 
+                Data is simulated for demonstration purposes.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

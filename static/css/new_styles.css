@@ -188,3 +188,122 @@ main {
         margin-left: 0 !important;
     }
 }
+/* Bank Integration Styles */
+.bank-logo {
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+.bank-logo:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+    transform: translateY(-2px);
+}
+
+/* Payment Status Colors */
+.payment-status-success {
+    color: #198754;
+    background-color: #d1e7dd;
+    border-color: #badbcc;
+}
+
+.payment-status-pending {
+    color: #664d03;
+    background-color: #fff3cd;
+    border-color: #ffecb5;
+}
+
+.payment-status-failed {
+    color: #842029;
+    background-color: #f8d7da;
+    border-color: #f5c2c7;
+}
+
+/* Transaction Table */
+.transaction-table td {
+    vertical-align: middle;
+}
+
+/* Card Styling */
+.card-header h5, .card-header h6 {
+    margin-bottom: 0;
+}
+
+/* Responsive Tables */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+}
+
+/* Button Groups */
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Alert Improvements */
+.alert h6 {
+    margin-bottom: 0.5rem;
+}
+
+/* Form Styling */
+.form-check-label {
+    font-weight: 500;
+}
+/* Sidebar Section Headers */
+.nav-link.text-muted {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-top: 1.5rem !important;
+    padding-bottom: 0.5rem !important;
+    color: #adb5bd !important;
+    border-bottom: 1px solid #495057;
+    margin-bottom: 0.5rem;
+}
+
+/* Sidebar active state */
+.nav-link.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-left: 4px solid #0d6efd;
+}
+
+.nav-link:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Sidebar icons spacing */
+.nav-link i {
+    width: 20px;
+    margin-right: 10px;
+    text-align: center;
+}
+
+/* Sub-menu indentation */
+.nav-link.sub-item {
+    padding-left: 2.5rem;
+    font-size: 0.9rem;
+}
+
+/* Sidebar scroll for tall content */
+.sidebar {
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Sidebar scrollbar styling */
+.sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #343a40;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #495057;
+    border-radius: 10px;
+}

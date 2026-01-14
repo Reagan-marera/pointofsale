@@ -329,3 +329,78 @@ class Item(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+# Add these new models to your existing models.py (CORRECTED VERSION)
+
+class BankAccount(db.Model):
+    """Model for storing business bank account information"""
+    __tablename__ = 'bank_accounts'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    account_name = db.Column(db.String(100), nullable=False)
+    account_number = db.Column(db.String(50), nullable=False)
+    bank_name = db.Column(db.String(100), nullable=False)
+    branch_code = db.Column(db.String(50))
+    account_type = db.Column(db.String(50))  # checking, savings, etc.
+    currency = db.Column(db.String(10), default='KES')
+    is_primary = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PaymentGateway(db.Model):
+    """Model for payment gateway configurations"""
+    __tablename__ = 'payment_gateways'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)  # stripe, paypal, mpesa, etc.
+    gateway_type = db.Column(db.String(50), nullable=False)  # card, mobile_money, bank_transfer
+    api_key = db.Column(db.String(255))  # Encrypted in production
+    api_secret = db.Column(db.String(255))
+    webhook_secret = db.Column(db.String(255))
+    merchant_id = db.Column(db.String(100))
+    is_active = db.Column(db.Boolean, default=True)
+    test_mode = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class BankTransaction(db.Model):
+    """Model for tracking bank transactions"""
+    __tablename__ = 'bank_transactions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    transaction_ref = db.Column(db.String(100), nullable=False, unique=True)
+    bank_account_id = db.Column(db.Integer, db.ForeignKey('bank_accounts.id'))
+    amount = db.Column(db.Float, nullable=False)
+    transaction_type = db.Column(db.String(50), nullable=False)  # deposit, withdrawal, transfer, fee
+    description = db.Column(db.Text)
+    status = db.Column(db.String(50), default='pending')  # pending, completed, failed
+    payment_method = db.Column(db.String(50))  # card, bank_transfer, mobile_money
+    gateway_id = db.Column(db.Integer, db.ForeignKey('payment_gateways.id'))
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True)
+    expense_id = db.Column(db.Integer, db.ForeignKey('expenses.id'), nullable=True)
+    transaction_date = db.Column(db.DateTime, default=datetime.utcnow)
+    posted_date = db.Column(db.DateTime)
+    # CHANGED: Renamed 'metadata' to 'transaction_data' to avoid conflict
+    transaction_data = db.Column(db.JSON)  # Store additional transaction data
+    
+    bank_account = db.relationship('BankAccount', backref='transactions')
+    gateway = db.relationship('PaymentGateway', backref='transactions')
+    sale = db.relationship('Sale', backref='bank_transactions')
+    expense = db.relationship('Expense', backref='bank_transactions')
+
+class BankAPIConnection(db.Model):
+    __tablename__ = 'bank_api_connections'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    bank_name = db.Column(db.String(100), nullable=False)
+    account_number = db.Column(db.String(50), nullable=False)
+    connection_type = db.Column(db.String(20), default='mock')  # mock, plaid, teller, etc.
+    connection_data = db.Column(db.JSON)  # Store API response data
+    is_active = db.Column(db.Boolean, default=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_synced = db.Column(db.DateTime, nullable=True)
+    
+    user = db.relationship('User', backref='bank_connections')
+    
+    def __repr__(self):
+        return f'<BankConnection {self.bank_name} - {self.account_number}>'
