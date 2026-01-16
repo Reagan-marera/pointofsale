@@ -30,15 +30,15 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            
+
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Account Number *</label>
-                                <input type="text" class="form-control" id="accountNumber" 
+                                <input type="text" class="form-control" id="accountNumber"
                                        placeholder="e.g., 1234567890" required>
-                                <div class="form-text">Enter any number for demo purposes</div>
+                                <div class="form-text">Enter your business account number</div>
                             </div>
                         </div>
-                        
+
                         <div class="mt-3">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-plug"></i> Connect Bank Account
@@ -55,26 +55,26 @@
         <div class="col-lg-4">
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Demo Mode</h5>
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Bank Integration Info</h5>
                 </div>
                 <div class="card-body">
-                    <p>This is a <strong>demonstration</strong> of bank integration.</p>
-                    
-                    <div class="alert alert-warning">
-                        <h6>Features:</h6>
+                    <p>Securely connect your business bank accounts.</p>
+
+                    <div class="alert alert-primary">
+                        <h6>Benefits:</h6>
                         <ul class="mb-0">
-                            <li>Connect to mock Kenyan banks</li>
-                            <li>View simulated transaction history</li>
-                            <li>See account balances and summaries</li>
-                            <li>No real bank credentials needed</li>
+                            <li>Automated bank reconciliation</li>
+                            <li>Real-time transaction tracking</li>
+                            <li>Multi-bank support</li>
+                            <li>Secure API-based connection</li>
                         </ul>
                     </div>
-                    
-                    <p class="mb-1"><strong>For testing:</strong></p>
+
+                    <p class="mb-1"><strong>Requirements:</strong></p>
                     <ul>
-                        <li>Use any account number</li>
-                        <li>Transactions are randomly generated</li>
-                        <li>Balances are simulated</li>
+                        <li>Active business bank account</li>
+                        <li>Authorized API access</li>
+                        <li>Valid account credentials</li>
                     </ul>
                 </div>
             </div>
@@ -94,12 +94,12 @@ document.getElementById('connectForm').addEventListener('submit', async function
         alert('Please select a bank and enter account number');
         return;
     }
-    
+
     // Show loading
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="bi bi-hourglass"></i> Connecting...';
     submitBtn.disabled = true;
-    
+
     try {
         const response = await fetch('/api/bank/connect', {
             method: 'POST',
@@ -109,20 +109,20 @@ document.getElementById('connectForm').addEventListener('submit', async function
                 account_number: accountInput.value.trim()
             })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             // Show success message
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
             alertDiv.innerHTML = `
-                <strong><i class="bi bi-check-circle"></i> Success!</strong> 
+                <strong><i class="bi bi-check-circle"></i> Success!</strong>
                 Connected to ${data.bank_name} (${data.account_number})
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             document.querySelector('.card-body').prepend(alertDiv);
-            
+
             // Redirect after 2 seconds
             setTimeout(() => {
                 window.location.href = `/bank/transactions/${data.db_id}`;
