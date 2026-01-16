@@ -128,7 +128,7 @@
     </div>
 </li>
 <li class="nav-item">
-    <a class="nav-link {% if request.endpoint == 'mock_bank_connect' %}active{% endif %}" href="{{ url_for('mock_bank_connect') }}">
+    <a class="nav-link {% if request.endpoint == 'bank_connect' %}active{% endif %}" href="{{ url_for('bank_connect') }}">
         <i class="fas fa-plug"></i> Bank Integration
     </a>
 </li>
@@ -140,6 +140,11 @@
 <li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'manage_bank_accounts' %}active{% endif %}" href="{{ url_for('manage_bank_accounts') }}">
         <i class="fas fa-landmark"></i> Bank Accounts
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link {% if request.endpoint == 'bank_settings' %}active{% endif %}" href="{{ url_for('bank_settings') }}">
+        <i class="fas fa-cog"></i> Integration Settings
     </a>
 </li>
 {% endif %}

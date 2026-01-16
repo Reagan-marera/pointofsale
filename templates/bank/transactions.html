@@ -38,7 +38,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header">
@@ -46,7 +46,7 @@
                 </div>
                 <div class="card-body">
                     <p><strong>Account Number:</strong> {{ connection.account_number }}</p>
-                    <p><strong>Account Type:</strong> 
+                    <p><strong>Account Type:</strong>
                         {{ connection.connection_data.get('account_type', 'Current') if connection.connection_data else 'Current' }}
                     </p>
                     <p><strong>Currency:</strong> {{ summary.currency }}</p>
@@ -99,11 +99,10 @@
                     </tbody>
                 </table>
             </div>
-            
+
             <div class="alert alert-info mt-3">
-                <i class="bi bi-info-circle"></i> 
-                Showing {{ transactions|length }} most recent transactions. 
-                Data is simulated for demonstration purposes.
+                <i class="bi bi-info-circle"></i>
+                Showing {{ transactions|length }} most recent transactions.
             </div>
         </div>
     </div>

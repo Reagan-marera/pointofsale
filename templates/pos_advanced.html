@@ -269,6 +269,8 @@ function togglePaymentOptions() {
     mpesaSection.style.display = method === 'mobile_money' ? 'block' : 'none';
 }
 
+let pollingInterval = null;
+
 function triggerStkPush() {
     const phone = document.getElementById('mpesaPhone').value;
     if (!phone) {
@@ -276,7 +278,7 @@ function triggerStkPush() {
         return;
     }
 
-    showPaymentStatus('Waiting for M-Pesa PIN entry on phone...', 'info');
+    showPaymentStatus('Initiating STK Push...', 'info');
 
     fetch('/api/mpesa/stk_push', {
         method: 'POST',
@@ -284,22 +286,50 @@ function triggerStkPush() {
         body: JSON.stringify({
             phone_number: phone,
             amount: cartTotal,
-            sale_id: null // Sale will be created after confirmation or now
+            sale_id: null
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             showNotification('Push sent! Check your phone.', 'success');
-            // In a real app, we would poll for status here
-            setTimeout(() => {
-                showPaymentStatus('M-Pesa payment received!', 'success');
-                processManualPayment('mobile_money', document.getElementById('customerEmail').value);
-            }, 3000);
+            showPaymentStatus('Awaiting PIN entry on phone...', 'info');
+            startPolling(data.checkout_id);
         } else {
             showPaymentStatus('Push failed: ' + data.error, 'danger');
         }
     });
+}
+
+function startPolling(checkoutId) {
+    if (pollingInterval) clearInterval(pollingInterval);
+
+    let attempts = 0;
+    const maxAttempts = 20; // ~1 minute
+
+    pollingInterval = setInterval(() => {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(pollingInterval);
+            showPaymentStatus('Payment timeout. Please try again.', 'warning');
+            return;
+        }
+
+        fetch(`/api/mpesa/status/${checkoutId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.status === 'Completed') {
+                clearInterval(pollingInterval);
+                showPaymentStatus('M-Pesa payment received!', 'success');
+                processManualPayment('mobile_money', document.getElementById('customerEmail').value);
+            } else if (data.status === 'Failed') {
+                clearInterval(pollingInterval);
+                showPaymentStatus('Payment failed or cancelled: ' + (data.ResultDesc || ''), 'danger');
+            }
+            // If pending, keep polling
+        })
+        .catch(err => console.error('Polling error:', err));
+    }, 3000);
 }
 
 function processPayment() {
