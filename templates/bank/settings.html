@@ -1,0 +1,92 @@
+{% extends "layouts/base.html" %}
+{% block title %}Bank & Mobile Money Integration Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Integration Settings</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-phone"></i> M-Pesa (Safaricom Daraja API)</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('bank_settings') }}">
+                        <input type="hidden" name="gateway_name" value="mpesa">
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Business Shortcode</label>
+                                <input type="text" class="form-control" name="merchant_id" value="{{ mpesa.merchant_id or '' }}" placeholder="e.g., 174379">
+                                <div class="form-text">Your Paybill or Till Number.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Environment</label>
+                                <select class="form-select" name="test_mode">
+                                    <option value="1" {% if mpesa.test_mode %}selected{% endif %}>Sandbox (Testing)</option>
+                                    <option value="0" {% if not mpesa.test_mode %}selected{% endif %}>Production (Live)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Consumer Key</label>
+                            <input type="text" class="form-control" name="api_key" value="{{ mpesa.api_key or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Consumer Secret</label>
+                            <input type="password" class="form-control" name="api_secret" value="{{ mpesa.api_secret or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Online Passkey (for STK Push)</label>
+                            <input type="password" class="form-control" name="webhook_secret" value="{{ mpesa.webhook_secret or '' }}">
+                            <div class="form-text">Used for LNM (Lipa na M-Pesa) Online STK Push.</div>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="mpesaActive" {% if mpesa.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="mpesaActive">Enable M-Pesa Integration</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-success">Save M-Pesa Settings</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-bank"></i> Bank API Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Configuration for local Kenyan bank APIs (Equity, KCB, etc.) will be managed here as specific bank modules are activated.</p>
+                    <div class="alert alert-info">
+                        Currently using the unified <strong>Kenya Bank API</strong> module for secure statement fetching.
+                    </div>
+                    <a href="{{ url_for('bank_connect') }}" class="btn btn-outline-primary">Manage Bank Connections</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h5>Integration Help</h5>
+                    <hr>
+                    <h6>M-Pesa Daraja:</h6>
+                    <p class="small">To get your keys, register on the <a href="https://developer.safaricom.co.ke/" target="_blank">Safaricom Daraja Portal</a>.</p>
+                    <ul>
+                        <li class="small">Create an App to get Consumer Key/Secret.</li>
+                        <li class="small">Use "Lipa Na M-Pesa Online" for STK Push.</li>
+                        <li class="small">Webhook URL: <code>{{ request.url_root }}api/mpesa/callback</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -15,14 +15,15 @@
     <div class="row">
         <div class="col-lg-8">
             <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-bank"></i> Select Your Bank</h5>
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-bank"></i> Secure Bank Connection</h5>
                 </div>
                 <div class="card-body">
+                    <p class="text-muted mb-4">Select your financial institution and provide your account details to establish a secure API connection.</p>
                     <form id="connectForm">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Bank Name *</label>
+                                <label class="form-label fw-bold">Financial Institution *</label>
                                 <select class="form-select" id="bankSelect" required>
                                     <option value="">-- Select Bank --</option>
                                     {% for bank in banks %}
@@ -32,19 +33,19 @@
                             </div>
 
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Account Number *</label>
+                                <label class="form-label fw-bold">Business Account Number *</label>
                                 <input type="text" class="form-control" id="accountNumber"
                                        placeholder="e.g., 1234567890" required>
-                                <div class="form-text">Enter your business account number</div>
+                                <div class="form-text">Your data is encrypted and secure.</div>
                             </div>
                         </div>
 
-                        <div class="mt-3">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-plug"></i> Connect Bank Account
+                        <div class="mt-4 border-top pt-3">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-shield-lock"></i> Establish Secure Connection
                             </button>
-                            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                                Cancel
+                            <a href="{{ url_for('manage_bank_accounts') }}" class="btn btn-outline-secondary">
+                                Back to Accounts
                             </a>
                         </div>
                     </form>

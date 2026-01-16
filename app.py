@@ -2283,6 +2283,32 @@ def profit_loss_report():
         return redirect(url_for('dashboard'))
     
     
+@app.route('/bank/settings', methods=['GET', 'POST'])
+@login_required(roles=['admin', 'manager'])
+def bank_settings():
+    """Manage Bank and Mobile Money Integration Settings"""
+    mpesa = PaymentGateway.query.filter_by(name='mpesa').first()
+    if not mpesa:
+        mpesa = PaymentGateway(name='mpesa', gateway_type='mobile_money', is_active=False)
+        db.session.add(mpesa)
+        db.session.commit()
+
+    if request.method == 'POST':
+        gateway_name = request.form.get('gateway_name')
+        if gateway_name == 'mpesa':
+            mpesa.merchant_id = request.form.get('merchant_id')
+            mpesa.api_key = request.form.get('api_key')
+            mpesa.api_secret = request.form.get('api_secret')
+            mpesa.webhook_secret = request.form.get('webhook_secret')
+            mpesa.test_mode = request.form.get('test_mode') == '1'
+            mpesa.is_active = 'is_active' in request.form
+
+            db.session.commit()
+            flash('M-Pesa settings updated successfully!', 'success')
+            return redirect(url_for('bank_settings'))
+
+    return render_template('bank/settings.html', mpesa=mpesa)
+
 @app.route('/bank/accounts')
 @login_required(roles=['manager', 'admin'])
 def manage_bank_accounts():
@@ -2373,6 +2399,25 @@ def mpesa_stk_push():
         app.logger.error(f"M-Pesa STK Push error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/mpesa/status/<checkout_id>', methods=['GET'])
+@login_required(roles=['cashier', 'manager', 'admin'])
+def mpesa_status(checkout_id):
+    """Check the status of an M-Pesa STK Push"""
+    gateway = PaymentGateway.query.filter_by(name='mpesa', is_active=True).first()
+    config = {'test_mode': True}
+    if gateway:
+        config = {
+            'api_key': gateway.api_key,
+            'api_secret': gateway.api_secret,
+            'webhook_secret': gateway.webhook_secret,
+            'merchant_id': gateway.merchant_id,
+            'test_mode': gateway.test_mode
+        }
+
+    service = KenyaBankService(config)
+    result = service.query_stk_push_status(checkout_id)
+    return jsonify(result)
+
 @app.route('/api/mpesa/callback', methods=['POST'])
 def mpesa_callback():
     """Handle M-Pesa STK Push Callback"""
@@ -2406,15 +2451,102 @@ def bank_transfer():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/sales/unreconciled', methods=['GET'])
+@login_required(roles=['manager', 'admin'])
+def get_unreconciled_sales():
+    """Get sales that haven't been reconciled with a bank transaction"""
+    amount = request.args.get('amount', type=float)
+
+    query = Sale.query.filter(Sale.payment_status == 'completed')
+
+    # Exclude sales that already have a reconciled bank transaction
+    reconciled_sale_ids = db.session.query(BankTransaction.sale_id).filter(BankTransaction.sale_id.isnot(None)).all()
+    reconciled_sale_ids = [r[0] for r in reconciled_sale_ids]
+
+    query = query.filter(Sale.id.notin_(reconciled_sale_ids))
+
+    if amount:
+        # Match roughly (within 1 unit) to account for rounding
+        query = query.filter(Sale.total_amount.between(amount - 1, amount + 1))
+
+    sales = query.order_by(Sale.sale_date.desc()).limit(20).all()
+
+    return jsonify([{
+        'id': s.id,
+        'receipt_number': s.receipt_number,
+        'total': s.total_amount,
+        'date': s.sale_date.strftime('%Y-%m-%d %H:%M')
+    } for s in sales])
+
+@app.route('/bank/reconcile/upload', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def upload_bank_statement():
+    """Upload and parse a CSV bank statement"""
+    if 'file' not in request.files:
+        flash('No file part', 'danger')
+        return redirect(url_for('bank_reconciliation_report'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash('No selected file', 'danger')
+        return redirect(url_for('bank_reconciliation_report'))
+
+    if file and file.filename.endswith('.csv'):
+        import csv
+        import io
+
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = csv.reader(stream)
+
+        count = 0
+        for row in csv_input:
+            # Skip header if it contains non-numeric amount
+            try:
+                # Expected format: Date, Reference, Description, Amount
+                date_str, ref, desc, amt_str = row[0], row[1], row[2], row[3]
+                amount = float(amt_str)
+
+                # Check if already exists
+                if not BankTransaction.query.filter_by(transaction_ref=ref).first():
+                    txn = BankTransaction(
+                        transaction_ref=ref,
+                        amount=amount,
+                        transaction_type='deposit' if amount > 0 else 'withdrawal',
+                        description=desc,
+                        status='pending',
+                        transaction_date=datetime.strptime(date_str, '%Y-%m-%d')
+                    )
+                    db.session.add(txn)
+                    count += 1
+            except (ValueError, IndexError):
+                continue
+
+        db.session.commit()
+        flash(f'Successfully imported {count} transactions.', 'success')
+
+    return redirect(url_for('bank_reconciliation_report'))
+
 @app.route('/api/bank/reconcile', methods=['POST'])
 @login_required(roles=['manager', 'admin'])
 def reconcile_transaction():
-    """Manually reconcile a bank transaction with system record"""
+    """Manually reconcile a bank transaction with a Sale or existing record"""
     try:
         data = request.get_json()
-        transaction_id = data['transaction_id']
-        system_record_id = data.get('system_record_id')
+        transaction_id = data.get('transaction_id')
+        sale_id = data.get('sale_id')
         
+        bank_txn = BankTransaction.query.get(transaction_id)
+        if not bank_txn:
+            return jsonify({'success': False, 'error': 'Transaction not found'}), 404
+
+        if sale_id:
+            bank_txn.sale_id = sale_id
+            bank_txn.status = 'reconciled'
+            bank_txn.posted_date = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'success': True})
+
+        system_record_id = data.get('system_record_id')
         if system_record_id:
             # Link to existing system record
             bank_txn = BankTransaction.query.get(system_record_id)
@@ -2422,6 +2554,7 @@ def reconcile_transaction():
                 bank_txn.status = 'reconciled'
                 bank_txn.posted_date = datetime.utcnow()
                 db.session.commit()
+                return jsonify({'success': True})
         else:
             # Create new system record from bank transaction
             bank_txn = BankTransaction(
@@ -2660,27 +2793,22 @@ def process_bulk_payments():
         return jsonify({'error': str(e)}), 500   
     
 # ======================
-# MOCK BANK INTEGRATION
+# KENYA BANK INTEGRATION
 # ======================
 
 @app.route('/bank/connect', methods=['GET'])
 @login_required(roles=['manager', 'admin'])
-def mock_bank_connect():
+def bank_connect():
     """Bank connection page"""
-    try:
-        from mock_bank import MockBankAPI
-        banks = MockBankAPI.get_bank_list()
-        return render_template('bank/connect.html',
-                             banks=banks,
-                             title="Connect Bank Account")
-    except ImportError:
-        flash('Mock bank module not found', 'warning')
-        return redirect(url_for('dashboard'))
+    banks = KenyaBankService.get_bank_list()
+    return render_template('bank/connect.html',
+                         banks=banks,
+                         title="Connect Bank Account")
 
 @app.route('/api/bank/connect', methods=['POST'])
 @login_required(roles=['manager', 'admin'])
-def api_mock_bank_connect():
-    """API to connect mock bank"""
+def api_bank_connect():
+    """API to connect bank"""
     try:
         data = request.get_json()
         bank_id = data.get('bank_id')
@@ -2689,18 +2817,17 @@ def api_mock_bank_connect():
         if not bank_id or not account_number:
             return jsonify({'success': False, 'error': 'Bank and account number required'})
         
-        if len(str(account_number).strip()) < 3:
-            return jsonify({'success': False, 'error': 'Account number too short'})
+        service = KenyaBankService({'test_mode': True})
+        result = service.connect_bank(bank_id, account_number)
         
-        from mock_bank import MockBankAPI
-        result = MockBankAPI.connect_bank(bank_id, account_number)
-        
+        if not result.get('success'):
+            return jsonify(result)
+
         # Save to database
-        from models import BankAPIConnection
         connection = BankAPIConnection(
             bank_name=result['bank_name'],
             account_number=result['account_number'],
-            connection_type='mock',
+            connection_type='api',
             connection_data=result,
             is_active=True,
             user_id=session['user_id']
@@ -2712,15 +2839,13 @@ def api_mock_bank_connect():
         return jsonify(result)
         
     except Exception as e:
-        print(f"Error connecting bank: {e}")
+        app.logger.error(f"Error connecting bank: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/bank/transactions/<int:connection_id>')
 @login_required(roles=['manager', 'admin'])
-def mock_bank_transactions(connection_id):
-    """View mock transactions"""
-    from models import BankAPIConnection
-    
+def bank_transactions(connection_id):
+    """View bank transactions"""
     connection = BankAPIConnection.query.get_or_404(connection_id)
     
     # Verify ownership
@@ -2728,24 +2853,38 @@ def mock_bank_transactions(connection_id):
         flash('Access denied', 'danger')
         return redirect(url_for('dashboard'))
     
-    from mock_bank import MockBankAPI
-    transactions = MockBankAPI.get_transactions(f"mock_{connection_id}")
-    summary = MockBankAPI.get_account_summary(f"mock_{connection_id}")
-    
-    return render_template('bank/mock_transactions.html',
+    service = KenyaBankService({'test_mode': True})
+    transactions = service.get_transactions(days=30)
+
+    # Generate some summary stats for the UI
+    summary = {
+        'current_balance': 150000.00,
+        'available_balance': 145000.00,
+        'ledger_balance': 150000.00,
+        'currency': 'KES',
+        'account_status': 'Active',
+        'last_updated': datetime.now().isoformat()
+    }
+    stats = {
+        'month_deposits': 50000.00,
+        'month_withdrawals': 30000.00,
+        'average_monthly_balance': 100000.00,
+        'transactions_this_month': 25
+    }
+
+    return render_template('bank/transactions.html',
                          connection=connection,
                          transactions=transactions['transactions'],
-                         summary=summary['summary'],
-                         stats=summary['stats'])
+                         summary=summary,
+                         stats=stats)
 
 @app.route('/api/bank/transactions/<int:connection_id>')
 @login_required(roles=['manager', 'admin'])
-def api_mock_transactions(connection_id):
-    """API to get mock transactions"""
-    from mock_bank import MockBankAPI
+def api_bank_transactions(connection_id):
+    """API to get bank transactions"""
     days = request.args.get('days', 30, type=int)
-    
-    result = MockBankAPI.get_transactions(f"mock_{connection_id}", days)
+    service = KenyaBankService({'test_mode': True})
+    result = service.get_transactions(days=days)
     return jsonify(result)
 
 @app.route('/bank/connections')

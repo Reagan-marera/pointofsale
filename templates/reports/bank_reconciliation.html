@@ -1,0 +1,197 @@
+{% extends "layouts/base.html" %}
+{% block title %}Bank Reconciliation{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Bank Reconciliation</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="bi bi-upload"></i> Upload Bank Statement (CSV)
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="text-muted">Unreconciled Transactions</h6>
+                    <h3>{{ unreconciled }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Total Deposits (Period)</h6>
+                    <h3>KES {{ "%.2f"|format(total_deposits) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Total Withdrawals (Period)</h6>
+                    <h3>KES {{ "%.2f"|format(total_withdrawals) }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reconciliation Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Bank Transactions</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Reference</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for txn in system_transactions %}
+                        <tr>
+                            <td>{{ txn.transaction_date.strftime('%Y-%m-%d') }}</td>
+                            <td><code>{{ txn.transaction_ref }}</code></td>
+                            <td>{{ txn.description }}</td>
+                            <td class="{{ 'text-success' if txn.amount > 0 else 'text-danger' }}">
+                                KES {{ "%.2f"|format(txn.amount) }}
+                            </td>
+                            <td>
+                                {% if txn.status == 'reconciled' %}
+                                <span class="badge bg-success">Reconciled</span>
+                                {% else %}
+                                <span class="badge bg-warning">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if txn.status != 'reconciled' %}
+                                <button class="btn btn-sm btn-outline-primary" onclick="openMatchModal({{ txn.id }}, {{ txn.amount }}, '{{ txn.description }}')">
+                                    Match
+                                </button>
+                                {% else %}
+                                <small class="text-muted">Sale #{{ txn.sale.receipt_number if txn.sale else 'N/A' }}</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Bank Statement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('upload_bank_statement') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Select CSV File</label>
+                        <input type="file" class="form-control" name="file" accept=".csv" required>
+                    </div>
+                    <div class="alert alert-info small">
+                        CSV format: Date, Reference, Description, Amount
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload & Process</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Match Modal -->
+<div class="modal fade" id="matchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Match Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="txnInfo" class="alert alert-secondary">
+                    <!-- Txn info goes here -->
+                </div>
+                <h6>Possible Sales Matches:</h6>
+                <div id="salesList" class="list-group">
+                    <!-- Sales will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openMatchModal(txnId, amount, description) {
+    const modal = new bootstrap.Modal(document.getElementById('matchModal'));
+    document.getElementById('txnInfo').innerHTML = `
+        <strong>Description:</strong> ${description}<br>
+        <strong>Amount:</strong> KES ${amount.toFixed(2)}
+    `;
+
+    // Load recent unreconciled sales
+    fetch(`/api/sales/unreconciled?amount=${amount}`)
+    .then(res => res.json())
+    .then(sales => {
+        const list = document.getElementById('salesList');
+        if (sales.length === 0) {
+            list.innerHTML = '<div class="alert alert-warning">No matching unreconciled sales found for this amount.</div>';
+        } else {
+            list.innerHTML = sales.map(sale => `
+                <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        onclick="reconcileMatch(${txnId}, ${sale.id})">
+                    <div>
+                        <strong>#${sale.receipt_number}</strong><br>
+                        <small>${sale.date}</small>
+                    </div>
+                    <span class="badge bg-primary">KES ${sale.total.toFixed(2)}</span>
+                </button>
+            `).join('');
+        }
+    });
+
+    modal.show();
+}
+
+function reconcileMatch(txnId, saleId) {
+    if (!confirm('Reconcile this bank transaction with selected sale?')) return;
+
+    fetch('/api/bank/reconcile', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            transaction_id: txnId,
+            system_record_id: txnId, // In this case, it's the same
+            sale_id: saleId
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+}
+</script>
+{% endblock %}
