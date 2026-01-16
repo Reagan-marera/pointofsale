@@ -2322,43 +2322,8 @@ def add_bank_account():
     return render_template('bank/add_account.html')
 
 # ======================
-# PAYMENT GATEWAY INTEGRATION
+# MPESA INTEGRATION
 # ======================
-
-@app.route('/payment/gateways')
-@login_required(roles=['admin'])
-def manage_payment_gateways():
-    """Manage payment gateway configurations"""
-    gateways = PaymentGateway.query.all()
-    return render_template('payment/gateways.html', gateways=gateways)
-
-@app.route('/payment/gateways/add', methods=['GET', 'POST'])
-@login_required(roles=['admin'])
-def add_payment_gateway():
-    """Add a new payment gateway"""
-    if request.method == 'POST':
-        try:
-            gateway = PaymentGateway(
-                name=request.form['name'],
-                gateway_type=request.form['gateway_type'],
-                api_key=request.form['api_key'],
-                api_secret=request.form.get('api_secret', ''),
-                webhook_secret=request.form.get('webhook_secret', ''),
-                merchant_id=request.form.get('merchant_id', ''),
-                is_active=request.form.get('is_active') == 'on',
-                test_mode=request.form.get('test_mode') == 'on'
-            )
-            
-            db.session.add(gateway)
-            db.session.commit()
-            
-            flash('Payment gateway added successfully!', 'success')
-            return redirect(url_for('manage_payment_gateways'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error adding payment gateway: {str(e)}', 'danger')
-    
-    return render_template('payment/add_gateway.html')
 
 @app.route('/api/mpesa/stk_push', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
@@ -2701,11 +2666,11 @@ def process_bulk_payments():
 @app.route('/bank/connect', methods=['GET'])
 @login_required(roles=['manager', 'admin'])
 def mock_bank_connect():
-    """Mock bank connection page"""
+    """Bank connection page"""
     try:
         from mock_bank import MockBankAPI
         banks = MockBankAPI.get_bank_list()
-        return render_template('bank/mock_connect.html', 
+        return render_template('bank/connect.html',
                              banks=banks,
                              title="Connect Bank Account")
     except ImportError:
