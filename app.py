@@ -570,26 +570,6 @@ def supplier_report():
 
     return render_template('supplier_report.html', suppliers=suppliers, products=products_data)
 
-@app.route('/admin/reports/profit_loss')
-@login_required(roles=['manager', 'admin'])
-def pnl_report():
-    # Get total sales
-    total_sales = db.session.query(func.sum(Sale.total_amount)).scalar() or 0
-
-    # Get total COGS
-    total_cogs = db.session.query(func.sum(SaleItem.quantity * Product.buying_price)).join(Product).scalar() or 0
-
-    # Get total expenses
-    total_expenses = db.session.query(func.sum(Expense.amount)).scalar() or 0
-
-    # Calculate net profit
-    net_profit = total_sales - total_cogs - total_expenses
-
-    return render_template('reports/profit_loss.html',
-                           total_sales=total_sales,
-                           total_cogs=total_cogs,
-                           total_expenses=total_expenses,
-                           net_profit=net_profit)
 
 @app.route('/admin/reports/sales')
 @login_required(roles=['manager'])
@@ -941,6 +921,7 @@ def create_sale():
             total_amount=total,
             payment_method=payment_method,
             channel='offline',
+            customer_email=data.get('customer_email'),
             split_payment=split_payment,
             location_id=session.get('location_id')
         )
@@ -2466,6 +2447,7 @@ def create_sale_with_payment():
             total_amount=total,
             payment_method=payment_method,
             channel='offline',
+            customer_email=data.get('customer_email'),
             split_payment=False,
             location_id=session.get('location_id')
         )

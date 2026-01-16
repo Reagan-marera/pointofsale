@@ -211,13 +211,6 @@
                         </li>
                         {% endif %}
                         
-                        {% if session['role'] in ['admin', 'manager'] %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('pnl_report') }}">
-                                <i class="fas fa-chart-pie"></i> Financial Reports
-                            </a>
-                        </li>
-                        {% endif %}
                         
                         {% if session.role in ['manager', 'admin', 'cashier'] %}
                         <li class="nav-item">

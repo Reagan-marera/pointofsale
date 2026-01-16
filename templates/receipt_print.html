@@ -38,7 +38,7 @@
         <p>Receipt #: {{ sale.receipt_number }}</p>
         <p>Date: {{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</p>
         <p>Cashier: {{ sale.user.username }}</p>
-        <p>Customer: {{ sale.customer.name if sale.customer else 'Walk-in' }}</p>
+        <p>Customer: {{ sale.customer_email if sale.customer_email else 'Walk-in' }}</p>
         <hr>
         <table>
             <thead>
