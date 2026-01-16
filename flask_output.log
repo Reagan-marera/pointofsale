@@ -1,0 +1,22 @@
+ * Serving Flask app 'app'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 132-491-319
+127.0.0.1 - - [16/Jan/2026 11:02:37] "GET /login HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jan/2026 11:02:37] "GET /static/css/new_styles.css HTTP/1.1" 200 -
+/app/app.py:254: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  user.last_login = datetime.utcnow()
+127.0.0.1 - - [16/Jan/2026 11:02:38] "[32mPOST /login HTTP/1.1[0m" 302 -
+/app/app.py:182: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  user = User.query.get(session['user_id'])
+127.0.0.1 - - [16/Jan/2026 11:02:38] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jan/2026 11:02:38] "[36mGET /static/css/new_styles.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [16/Jan/2026 11:02:38] "GET /payment/gateways/add HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jan/2026 11:02:38] "[36mGET /static/css/new_styles.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [16/Jan/2026 11:02:39] "GET /pos_advanced HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jan/2026 11:02:39] "[36mGET /static/css/new_styles.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [16/Jan/2026 11:02:39] "POST /api/mpesa/stk_push HTTP/1.1" 200 -

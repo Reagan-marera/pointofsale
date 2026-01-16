@@ -159,18 +159,19 @@ function showGatewayHelp(gateway) {
     
     switch(gateway) {
         case 'mpesa':
-            title = 'M-Pesa Setup';
+            title = 'M-Pesa Setup (Daraja API)';
             content = `
                 <h6><i class="bi bi-phone text-success"></i> M-Pesa Configuration</h6>
                 <ol class="small">
-                    <li>Contact Safaricom Developer Portal</li>
-                    <li>Register for Daraja API</li>
-                    <li>Get Consumer Key and Secret</li>
-                    <li>Configure Callback URLs</li>
-                    <li>Test with Safaricom sandbox</li>
+                    <li>Go to <a href="https://developer.safaricom.co.ke/" target="_blank">Safaricom Developer Portal</a></li>
+                    <li>Create a new App to get <strong>Consumer Key</strong> and <strong>Consumer Secret</strong></li>
+                    <li>Use <strong>Consumer Key</strong> as API Key</li>
+                    <li>Use <strong>Consumer Secret</strong> as API Secret</li>
+                    <li>For <strong>Webhook Secret</strong>, use your <strong>Lipa na M-Pesa Online Passkey</strong></li>
+                    <li>For <strong>Merchant ID</strong>, use your <strong>Business Shortcode</strong> (Paybill/Till)</li>
                 </ol>
                 <div class="alert alert-info small">
-                    <strong>Requirements:</strong> Business registration with Safaricom
+                    <strong>Note:</strong> STK Push will be enabled automatically for M-Pesa gateway.
                 </div>
             `;
             break;
@@ -178,12 +179,12 @@ function showGatewayHelp(gateway) {
         case 'equity':
             title = 'Equity Bank Setup';
             content = `
-                <h6><i class="bi bi-bank text-primary"></i> Equity Bank EazzyPay</h6>
+                <h6><i class="bi bi-bank text-primary"></i> Equity Bank (EazzyAPI)</h6>
                 <ol class="small">
-                    <li>Contact Equity Bank Business Banking</li>
-                    <li>Request EazzyPay API integration</li>
-                    <li>Get Merchant ID and API credentials</li>
-                    <li>Configure IP whitelisting</li>
+                    <li>Register on <a href="https://developers.equitybankgroup.com/" target="_blank">Equity Developer Portal</a></li>
+                    <li>Create an application to get <strong>App ID</strong> and <strong>App Secret</strong></li>
+                    <li>Use <strong>App ID</strong> as API Key and <strong>App Secret</strong> as API Secret</li>
+                    <li>Merchant ID is your Equity Business Account Number</li>
                 </ol>
             `;
             break;

@@ -2,7 +2,9 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, f
 from flask_mail import Mail, Message
 from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category,BankTransaction,BankAccount,PaymentGateway,BankAPIConnection
 from datetime import datetime,timedelta
+from kenya_bank_service import KenyaBankService
 import random
+import json
 from sqlalchemy.orm import joinedload
 import string
 from config import Config
@@ -2357,6 +2359,87 @@ def add_payment_gateway():
             flash(f'Error adding payment gateway: {str(e)}', 'danger')
     
     return render_template('payment/add_gateway.html')
+
+@app.route('/api/mpesa/stk_push', methods=['POST'])
+@login_required(roles=['cashier', 'manager', 'admin'])
+def mpesa_stk_push():
+    """Initiate M-Pesa STK Push"""
+    try:
+        data = request.get_json()
+        phone_number = data.get('phone_number')
+        amount = data.get('amount')
+        sale_id = data.get('sale_id')
+
+        # Format phone number to 254...
+        if phone_number.startswith('0'):
+            phone_number = '254' + phone_number[1:]
+        elif phone_number.startswith('+'):
+            phone_number = phone_number[1:]
+
+        gateway = PaymentGateway.query.filter_by(name='mpesa', is_active=True).first()
+        config = {}
+        if gateway:
+            config = {
+                'api_key': gateway.api_key,
+                'api_secret': gateway.api_secret,
+                'webhook_secret': gateway.webhook_secret,
+                'merchant_id': gateway.merchant_id,
+                'test_mode': gateway.test_mode,
+                'callback_url': f"{request.url_root.rstrip('/')}/api/mpesa/callback"
+            }
+        else:
+            # Default to simulation if not configured
+            config = {'test_mode': True}
+
+        service = KenyaBankService(config)
+        result = service.initiate_stk_push(
+            phone_number=phone_number,
+            amount=amount,
+            account_ref=f"Sale-{sale_id}" if sale_id else "POS-Sale",
+            description="Payment for POS Sale"
+        )
+
+        if result.get('ResponseCode') == '0' or result.get('success'):
+            return jsonify({'success': True, 'checkout_id': result.get('CheckoutRequestID')})
+        else:
+            return jsonify({'success': False, 'error': result.get('ResponseDescription', 'Unknown error')}), 400
+
+    except Exception as e:
+        app.logger.error(f"M-Pesa STK Push error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/mpesa/callback', methods=['POST'])
+def mpesa_callback():
+    """Handle M-Pesa STK Push Callback"""
+    data = request.get_json()
+    app.logger.info(f"M-Pesa Callback received: {json.dumps(data)}")
+
+    # Process the callback data
+    # Real logic would update transaction status in DB
+    return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'})
+
+@app.route('/api/bank/transfer', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def bank_transfer():
+    """Initiate a bank transfer (B2C or inter-bank)"""
+    try:
+        data = request.get_json()
+        target = data.get('target') # phone or account number
+        amount = data.get('amount')
+        transfer_type = data.get('type', 'mpesa') # mpesa or bank
+
+        # Real implementation would use KenyaBankService
+        service = KenyaBankService({'test_mode': True})
+
+        if transfer_type == 'mpesa':
+            result = service.initiate_b2c_transfer(target, amount, "Payment")
+        else:
+            # Generic bank transfer logic
+            result = {'success': True, 'simulation': True}
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/bank/reconcile', methods=['POST'])
 @login_required(roles=['manager', 'admin'])
