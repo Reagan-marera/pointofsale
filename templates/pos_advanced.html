@@ -71,17 +71,6 @@
                         </select>
                     </div>
                     
-                    <!-- Payment Gateway Selection -->
-                    <div class="mb-3" id="gatewaySection" style="display: none;">
-                        <label class="form-label">Payment Gateway</label>
-                        <select class="form-select" id="paymentGateway">
-                            {% for gateway in payment_gateways %}
-                            {% if gateway.is_active %}
-                            <option value="{{ gateway.name }}">{{ gateway.name|capitalize }}</option>
-                            {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
                     
                     <!-- Bank Account Selection -->
                     <div class="mb-3" id="bankAccountSection" style="display: none;">
@@ -259,11 +248,9 @@ function clearCart() {
 
 function togglePaymentOptions() {
     const method = document.getElementById('paymentMethod').value;
-    const gatewaySection = document.getElementById('gatewaySection');
     const bankSection = document.getElementById('bankAccountSection');
     const splitSection = document.getElementById('splitPaymentSection');
     
-    gatewaySection.style.display = ['card', 'mobile_money'].includes(method) ? 'block' : 'none';
     bankSection.style.display = method === 'bank_transfer' ? 'block' : 'none';
     splitSection.style.display = method === 'split' ? 'block' : 'none';
 }
@@ -276,25 +263,20 @@ function processPayment() {
     
     const paymentMethod = document.getElementById('paymentMethod').value;
     const customerEmail = document.getElementById('customerEmail').value;
-    const gateway = document.getElementById('paymentGateway').value;
     
     showPaymentStatus('Processing payment...', 'info');
     
-    // For electronic payments
-    if (['card', 'mobile_money'].includes(paymentMethod)) {
-        processElectronicPayment(paymentMethod, gateway, customerEmail);
-    } 
     // For bank transfers
-    else if (paymentMethod === 'bank_transfer') {
+    if (paymentMethod === 'bank_transfer') {
         processBankTransfer(customerEmail);
     }
-    // For cash
+    // For cash, card (manual), mobile_money (manual)
     else {
-        processCashPayment(customerEmail);
+        processManualPayment(paymentMethod, customerEmail);
     }
 }
 
-function processElectronicPayment(method, gateway, email) {
+function processManualPayment(method, email) {
     fetch('/api/sale/create_with_payment', {
         method: 'POST',
         headers: {
@@ -303,23 +285,14 @@ function processElectronicPayment(method, gateway, email) {
         body: JSON.stringify({
             items: cart,
             payment_method: method,
-            gateway: gateway,
             customer_email: email
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            if (data.payment_result && data.payment_result.client_secret) {
-                // Handle Stripe payment
-                handleStripePayment(data.payment_result.client_secret, data.receipt_number);
-            } else if (data.payment_result && data.payment_result.links) {
-                // Handle PayPal payment
-                handlePayPalPayment(data.payment_result.links, data.receipt_number);
-            } else {
-                showPaymentStatus('Payment successful!', 'success');
-                printReceipt(data.receipt_number);
-            }
+            showPaymentStatus('Payment recorded successfully!', 'success');
+            printReceipt(data.receipt_number);
         } else {
             showPaymentStatus(`Error: ${data.error}`, 'danger');
         }
@@ -327,22 +300,6 @@ function processElectronicPayment(method, gateway, email) {
     .catch(error => {
         showPaymentStatus('Network error occurred', 'danger');
     });
-}
-
-function handleStripePayment(clientSecret, receiptNumber) {
-    // Initialize Stripe Elements (would require Stripe.js)
-    showPaymentStatus('Redirecting to Stripe...', 'info');
-    // In production, you would use Stripe.js Elements
-    alert(`Stripe Payment: ${receiptNumber}\nClient Secret: ${clientSecret}`);
-}
-
-function handlePayPalPayment(links, receiptNumber) {
-    // Find approval link
-    const approvalLink = links.find(link => link.rel === 'approve');
-    if (approvalLink) {
-        showPaymentStatus('Redirecting to PayPal...', 'info');
-        window.open(approvalLink.href, '_blank');
-    }
 }
 
 function processBankTransfer(email) {
@@ -372,28 +329,6 @@ function processBankTransfer(email) {
     });
 }
 
-function processCashPayment(email) {
-    fetch('/api/sale/create_with_payment', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            items: cart,
-            payment_method: 'cash',
-            customer_email: email
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showPaymentStatus('Cash payment recorded!', 'success');
-            printReceipt(data.receipt_number);
-        } else {
-            showPaymentStatus(`Error: ${data.error}`, 'danger');
-        }
-    });
-}
 
 function showPaymentStatus(message, type) {
     const statusDiv = document.getElementById('paymentStatus');
