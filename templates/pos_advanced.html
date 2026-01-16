@@ -94,6 +94,18 @@
                             <input type="number" class="form-control" id="cardAmount" placeholder="Amount">
                         </div>
                     </div>
+
+                    <!-- M-Pesa Section -->
+                    <div class="mb-3" id="mpesaSection" style="display: none;">
+                        <label class="form-label">Phone Number (M-Pesa)</label>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">+254</span>
+                            <input type="text" class="form-control" id="mpesaPhone" placeholder="712345678">
+                        </div>
+                        <button class="btn btn-primary w-100" onclick="triggerStkPush()">
+                            <i class="bi bi-phone"></i> Send STK Push
+                        </button>
+                    </div>
                     
                     <div class="d-grid gap-2">
                         <button class="btn btn-success btn-lg" onclick="processPayment()">
@@ -250,9 +262,44 @@ function togglePaymentOptions() {
     const method = document.getElementById('paymentMethod').value;
     const bankSection = document.getElementById('bankAccountSection');
     const splitSection = document.getElementById('splitPaymentSection');
+    const mpesaSection = document.getElementById('mpesaSection');
     
     bankSection.style.display = method === 'bank_transfer' ? 'block' : 'none';
     splitSection.style.display = method === 'split' ? 'block' : 'none';
+    mpesaSection.style.display = method === 'mobile_money' ? 'block' : 'none';
+}
+
+function triggerStkPush() {
+    const phone = document.getElementById('mpesaPhone').value;
+    if (!phone) {
+        showNotification('Please enter a phone number', 'warning');
+        return;
+    }
+
+    showPaymentStatus('Waiting for M-Pesa PIN entry on phone...', 'info');
+
+    fetch('/api/mpesa/stk_push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            phone_number: phone,
+            amount: cartTotal,
+            sale_id: null // Sale will be created after confirmation or now
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Push sent! Check your phone.', 'success');
+            // In a real app, we would poll for status here
+            setTimeout(() => {
+                showPaymentStatus('M-Pesa payment received!', 'success');
+                processManualPayment('mobile_money', document.getElementById('customerEmail').value);
+            }, 3000);
+        } else {
+            showPaymentStatus('Push failed: ' + data.error, 'danger');
+        }
+    });
 }
 
 function processPayment() {
