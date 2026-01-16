@@ -151,20 +151,26 @@ class KenyaBankService:
             transactions = []
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
+            current_sim_balance = 250000.00
             for i in range(random.randint(15, 40)):
                 date = start_date + timedelta(days=random.randint(0, days))
                 is_deposit = random.random() > 0.6
                 amount = round(random.uniform(100, 50000), 2) * (1 if is_deposit else -1)
                 trans_type = 'deposit' if is_deposit else 'withdrawal'
+
                 transactions.append({
                     'id': f"txn_{int(date.timestamp())}_{i}",
                     'date': date.strftime('%Y-%m-%d'),
+                    'time': date.strftime('%H:%M'),
                     'description': f"{trans_type.capitalize()} Transaction",
                     'type': trans_type,
+                    'category': random.choice(['Sales', 'Supplies', 'Utilities', 'Rent', 'Payroll', 'Other']),
                     'amount': amount,
+                    'balance': current_sim_balance,
                     'reference': f"REF{random.randint(1000, 9999)}",
                     'status': 'completed'
                 })
+                current_sim_balance -= amount # Reverse to simulate backward in time
             transactions.sort(key=lambda x: x['date'], reverse=True)
             return {'success': True, 'transactions': transactions}
         return {'success': False, 'error': 'Bank API not configured'}

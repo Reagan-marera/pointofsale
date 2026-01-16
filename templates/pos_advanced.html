@@ -1,7 +1,13 @@
 {% extends "layouts/base.html" %}
-{% block title %}Advanced POS{% endblock %}
+{% block title %}Integrated Bank POS{% endblock %}
 {% block content %}
 <div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2"><i class="bi bi-bank"></i> Integrated Bank & M-Pesa POS</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <span class="badge bg-success p-2"><i class="bi bi-shield-check"></i> Secure Bank API Connected</span>
+        </div>
+    </div>
     <div class="row">
         <!-- Product Selection -->
         <div class="col-md-8">
@@ -65,8 +71,8 @@
                         <select class="form-select" id="paymentMethod" onchange="togglePaymentOptions()">
                             <option value="cash">Cash</option>
                             <option value="card">Credit/Debit Card</option>
-                            <option value="mobile_money">Mobile Money</option>
-                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="mobile_money">Mobile Money (M-Pesa STK Push)</option>
+                            <option value="bank_transfer">Bank Transfer (Direct API)</option>
                             <option value="split">Split Payment</option>
                         </select>
                     </div>
