@@ -352,9 +352,9 @@ class PaymentGateway(db.Model):
     __tablename__ = 'payment_gateways'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), nullable=False)  # stripe, paypal, mpesa, etc.
+    name = db.Column(db.String(50), nullable=False)
     gateway_type = db.Column(db.String(50), nullable=False)  # card, mobile_money, bank_transfer
-    api_key = db.Column(db.String(255))  # Encrypted in production
+    api_key = db.Column(db.String(255))
     api_secret = db.Column(db.String(255))
     webhook_secret = db.Column(db.String(255))
     merchant_id = db.Column(db.String(100))
@@ -393,7 +393,7 @@ class BankAPIConnection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     bank_name = db.Column(db.String(100), nullable=False)
     account_number = db.Column(db.String(50), nullable=False)
-    connection_type = db.Column(db.String(20), default='mock')  # mock, plaid, teller, etc.
+    connection_type = db.Column(db.String(20), default='mock')  # e.g., mock
     connection_data = db.Column(db.JSON)  # Store API response data
     is_active = db.Column(db.Boolean, default=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

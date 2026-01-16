@@ -23,8 +23,6 @@
                             <label for="name" class="form-label">Gateway Name *</label>
                             <select class="form-select" id="name" name="name" required onchange="showGatewayHelp(this.value)">
                                 <option value="">Select Gateway</option>
-                                <option value="stripe">Stripe</option>
-                                <option value="paypal">PayPal</option>
                                 <option value="mpesa">M-Pesa</option>
                                 <option value="equity">Equity Bank</option>
                                 <option value="kcb">KCB Bank</option>
@@ -160,40 +158,6 @@ function showGatewayHelp(gateway) {
     let title = 'Gateway Information';
     
     switch(gateway) {
-        case 'stripe':
-            title = 'Stripe Setup';
-            content = `
-                <h6><i class="bi bi-stripe text-primary"></i> Stripe Configuration</h6>
-                <ol class="small">
-                    <li>Go to <a href="https://dashboard.stripe.com" target="_blank">Stripe Dashboard</a></li>
-                    <li>Navigate to Developers → API Keys</li>
-                    <li>Copy your Publishable Key and Secret Key</li>
-                    <li>Set up webhook endpoint: <code>${window.location.origin}/payment/webhook/stripe</code></li>
-                    <li>Copy webhook signing secret</li>
-                </ol>
-                <div class="alert alert-info small">
-                    <strong>Test Mode:</strong> Use keys prefixed with <code>sk_test_</code> or <code>pk_test_</code>
-                </div>
-            `;
-            break;
-            
-        case 'paypal':
-            title = 'PayPal Setup';
-            content = `
-                <h6><i class="bi bi-paypal text-info"></i> PayPal Configuration</h6>
-                <ol class="small">
-                    <li>Go to <a href="https://developer.paypal.com" target="_blank">PayPal Developer</a></li>
-                    <li>Create a REST API app</li>
-                    <li>Copy Client ID and Secret</li>
-                    <li>Set Return URL: <code>${window.location.origin}/payment/paypal/return</code></li>
-                    <li>Set Cancel URL: <code>${window.location.origin}/payment/paypal/cancel</code></li>
-                </ol>
-                <div class="alert alert-info small">
-                    <strong>Note:</strong> Use sandbox credentials for testing
-                </div>
-            `;
-            break;
-            
         case 'mpesa':
             title = 'M-Pesa Setup';
             content = `
