@@ -7,7 +7,7 @@
         <a href="{{ url_for('add_bank_account') }}" class="btn btn-sm btn-primary">
             <i class="bi bi-plus-circle"></i> Add Bank Account
         </a>
-        <a href="{{ url_for('connect_bank_api') }}" class="btn btn-sm btn-outline-secondary ms-2">
+        <a href="{{ url_for('mock_bank_connect') }}" class="btn btn-sm btn-outline-secondary ms-2">
             <i class="bi bi-plug"></i> Connect Bank API
         </a>
     </div>
@@ -74,7 +74,7 @@
         <div class="alert alert-info">
             <i class="bi bi-info-circle"></i> No bank accounts found. 
             <a href="{{ url_for('add_bank_account') }}">Add your first bank account</a> or 
-            <a href="{{ url_for('connect_bank_api') }}">connect via bank API</a>.
+            <a href="{{ url_for('mock_bank_connect') }}">connect via bank API</a>.
         </div>
         {% endif %}
     </div>
@@ -91,8 +91,8 @@
                     <a href="{{ url_for('bank_reconciliation_report') }}" class="btn btn-outline-primary">
                         <i class="bi bi-arrow-left-right"></i> Bank Reconciliation
                     </a>
-                    <a href="{{ url_for('get_bank_transactions') }}?days=30" class="btn btn-outline-secondary">
-                        <i class="bi bi-list-check"></i> View Transactions
+                    <a href="{{ url_for('list_bank_connections') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-list-check"></i> View Connections
                     </a>
                     <a href="{{ url_for('manage_payment_gateways') }}" class="btn btn-outline-info">
                         <i class="bi bi-credit-card"></i> Payment Gateways
@@ -108,17 +108,12 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <strong>Payment Gateways:</strong>
-                    <span class="badge bg-success">Stripe Available</span>
-                    <span class="badge bg-warning">PayPal Test Mode</span>
+                    <strong>Status:</strong>
+                    <span class="badge bg-success">Manual Integration Active</span>
                 </div>
                 <div class="mb-3">
-                    <strong>Bank APIs:</strong>
-                    <span class="badge bg-info">Plaid Connected</span>
-                    <span class="badge bg-secondary">Teller Available</span>
-                </div>
-                <div>
-                    <strong>Last Sync:</strong> 2 hours ago
+                    <strong>Mock API:</strong>
+                    <span class="badge bg-info">Available</span>
                 </div>
             </div>
         </div>
