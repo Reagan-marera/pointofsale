@@ -2287,27 +2287,33 @@ def profit_loss_report():
 @login_required(roles=['admin', 'manager'])
 def bank_settings():
     """Manage Bank and Mobile Money Integration Settings"""
-    mpesa = PaymentGateway.query.filter_by(name='mpesa').first()
-    if not mpesa:
-        mpesa = PaymentGateway(name='mpesa', gateway_type='mobile_money', is_active=False)
-        db.session.add(mpesa)
-        db.session.commit()
+    gateways = ['mpesa', 'equity', 'kcb', 'coop']
+    gw_objects = {}
+
+    for gw_name in gateways:
+        gw = PaymentGateway.query.filter_by(name=gw_name).first()
+        if not gw:
+            gw = PaymentGateway(name=gw_name, gateway_type='bank' if gw_name != 'mpesa' else 'mobile_money', is_active=False)
+            db.session.add(gw)
+            db.session.commit()
+        gw_objects[gw_name] = gw
 
     if request.method == 'POST':
         gateway_name = request.form.get('gateway_name')
-        if gateway_name == 'mpesa':
-            mpesa.merchant_id = request.form.get('merchant_id')
-            mpesa.api_key = request.form.get('api_key')
-            mpesa.api_secret = request.form.get('api_secret')
-            mpesa.webhook_secret = request.form.get('webhook_secret')
-            mpesa.test_mode = request.form.get('test_mode') == '1'
-            mpesa.is_active = 'is_active' in request.form
+        if gateway_name in gw_objects:
+            gw = gw_objects[gateway_name]
+            gw.merchant_id = request.form.get('merchant_id')
+            gw.api_key = request.form.get('api_key')
+            gw.api_secret = request.form.get('api_secret')
+            gw.webhook_secret = request.form.get('webhook_secret')
+            gw.test_mode = request.form.get('test_mode') == '1'
+            gw.is_active = 'is_active' in request.form
 
             db.session.commit()
-            flash('M-Pesa settings updated successfully!', 'success')
+            flash(f'{gateway_name.capitalize()} settings updated successfully!', 'success')
             return redirect(url_for('bank_settings'))
 
-    return render_template('bank/settings.html', mpesa=mpesa)
+    return render_template('bank/settings.html', **gw_objects)
 
 @app.route('/bank/accounts')
 @login_required(roles=['manager', 'admin'])

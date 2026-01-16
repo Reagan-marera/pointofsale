@@ -58,16 +58,79 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-bank"></i> Bank API Configuration</h5>
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-bank2"></i> Co-operative Bank API</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">Configuration for local Kenyan bank APIs (Equity, KCB, etc.) will be managed here as specific bank modules are activated.</p>
-                    <div class="alert alert-info">
-                        Currently using the unified <strong>Kenya Bank API</strong> module for secure statement fetching.
-                    </div>
-                    <a href="{{ url_for('bank_connect') }}" class="btn btn-outline-primary">Manage Bank Connections</a>
+                    <form method="POST" action="{{ url_for('bank_settings') }}">
+                        <input type="hidden" name="gateway_name" value="coop">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">API Key</label>
+                            <input type="text" class="form-control" name="api_key" value="{{ coop.api_key or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">API Secret</label>
+                            <input type="password" class="form-control" name="api_secret" value="{{ coop.api_secret or '' }}">
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="coopActive" {% if coop.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="coopActive">Enable Co-op Bank API</label>
+                        </div>
+                        <button type="submit" class="btn btn-info text-white">Save Co-op Settings</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-bank"></i> Equity Bank (EazzyAPI)</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('bank_settings') }}">
+                        <input type="hidden" name="gateway_name" value="equity">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Client ID</label>
+                            <input type="text" class="form-control" name="api_key" value="{{ equity.api_key or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Secret Key</label>
+                            <input type="password" class="form-control" name="api_secret" value="{{ equity.api_secret or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Merchant ID</label>
+                            <input type="text" class="form-control" name="merchant_id" value="{{ equity.merchant_id or '' }}">
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="equityActive" {% if equity.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="equityActive">Enable Equity Bank API</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Equity Settings</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-bank2"></i> KCB Bank API</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('bank_settings') }}">
+                        <input type="hidden" name="gateway_name" value="kcb">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">API Key</label>
+                            <input type="text" class="form-control" name="api_key" value="{{ kcb.api_key or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">API Secret</label>
+                            <input type="password" class="form-control" name="api_secret" value="{{ kcb.api_secret or '' }}">
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="kcbActive" {% if kcb.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="kcbActive">Enable KCB API</label>
+                        </div>
+                        <button type="submit" class="btn btn-dark">Save KCB Settings</button>
+                    </form>
                 </div>
             </div>
         </div>

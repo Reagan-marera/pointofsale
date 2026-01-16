@@ -90,9 +90,9 @@
                                 </span>
                             </td>
                             <td class="text-end {{ 'text-success' if txn.amount > 0 else 'text-danger' }}">
-                                {{ "%+.2f"|format(txn.amount) }}
+                                {{ "%+.2f"|format(txn.amount|default(0)) }}
                             </td>
-                            <td class="text-end">{{ "%.2f"|format(txn.balance) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(txn.balance|default(0)) }}</td>
                             <td><code>{{ txn.reference }}</code></td>
                         </tr>
                         {% endfor %}

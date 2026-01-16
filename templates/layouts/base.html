@@ -103,13 +103,13 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'pos' %}active{% endif %}" href="{{ url_for('pos') }}">
-                                <i class="fas fa-shopping-cart"></i> Basic POS
+                                <i class="fas fa-shopping-cart"></i> Manual POS (Cash/Card)
                             </a>
                         </li>
                         {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'pos_advanced' %}active{% endif %}" href="{{ url_for('pos_advanced') }}">
-                                <i class="fas fa-credit-card"></i> Advanced POS
+                                <i class="fas fa-university"></i> Bank Integrated POS
                             </a>
                         </li>
                         {% endif %}
@@ -129,22 +129,22 @@
 </li>
 <li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'bank_connect' %}active{% endif %}" href="{{ url_for('bank_connect') }}">
-        <i class="fas fa-plug"></i> Bank Integration
+        <i class="fas fa-plug"></i> Connect New Bank
     </a>
 </li>
 <li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'list_bank_connections' %}active{% endif %}" href="{{ url_for('list_bank_connections') }}">
-        <i class="fas fa-list"></i> Bank Connections
+        <i class="fas fa-list"></i> API Connections
     </a>
 </li>
 <li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'manage_bank_accounts' %}active{% endif %}" href="{{ url_for('manage_bank_accounts') }}">
-        <i class="fas fa-landmark"></i> Bank Accounts
+        <i class="fas fa-landmark"></i> Physical Accounts
     </a>
 </li>
 <li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'bank_settings' %}active{% endif %}" href="{{ url_for('bank_settings') }}">
-        <i class="fas fa-cog"></i> Integration Settings
+        <i class="fas fa-cog"></i> API Gateway Config
     </a>
 </li>
 {% endif %}
