@@ -106,6 +106,7 @@ class Sale(db.Model):
     payment_status = db.Column(db.String(20), default='completed')
     sale_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     channel = db.Column(db.String(20), default='offline')
+    customer_email = db.Column(db.String(100))
     split_payment = db.Column(db.Boolean, default=False)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
 

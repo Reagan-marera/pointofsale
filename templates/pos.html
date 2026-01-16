@@ -74,6 +74,10 @@
                     </table>
                 </div>
                 <div class="mb-3">
+                    <label for="customer-email" class="form-label">Customer Email</label>
+                    <input type="email" class="form-control" id="customer-email" placeholder="customer@example.com">
+                </div>
+                <div class="mb-3">
                     <label class="form-label">Payment Method</label>
                     <div class="btn-group w-100" role="group">
                         <input type="radio" class="btn-check" name="payment-method" id="cash" value="cash" checked>
@@ -211,6 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
         const splitPayment = document.getElementById('split-payment').checked;
+        const customerEmail = document.getElementById('customer-email').value;
         
         fetch('/api/sales', {
             method: 'POST',
@@ -218,7 +223,8 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify({
                 items: cart,
                 payment_method: paymentMethod,
-                split_payment: splitPayment
+                split_payment: splitPayment,
+                customer_email: customerEmail
             })
         })
         .then(response => response.json())

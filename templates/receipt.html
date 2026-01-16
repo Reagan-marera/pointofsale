@@ -74,6 +74,12 @@
                                 <td>Payment Method:</td>
                                 <td class="text-end">{{ sale.payment_method|upper }}</td>
                             </tr>
+                            {% if sale.customer_email %}
+                            <tr>
+                                <td>Customer Email:</td>
+                                <td class="text-end">{{ sale.customer_email }}</td>
+                            </tr>
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>
