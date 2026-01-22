@@ -405,3 +405,49 @@ class BankAPIConnection(db.Model):
     
     def __repr__(self):
         return f'<BankConnection {self.bank_name} - {self.account_number}>'
+
+class Debtor(db.Model):
+    __tablename__ = 'debtors'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(20))
+    email = db.Column(db.String(100))
+    address = db.Column(db.Text)
+    total_debt = db.Column(db.Float, default=0.0)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    debts = db.relationship('Debt', backref='debtor', cascade='all, delete-orphan')
+    payments = db.relationship('DebtPayment', backref='debtor', cascade='all, delete-orphan')
+
+class Debt(db.Model):
+    __tablename__ = 'debts'
+    id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.Integer, db.ForeignKey('debtors.id'), nullable=False)
+    total_amount = db.Column(db.Float, nullable=False)
+    remaining_amount = db.Column(db.Float, nullable=False)
+    date = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending') # pending, partial, paid
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True) # Optional link to a sale
+
+    items = db.relationship('DebtItem', backref='debt', cascade='all, delete-orphan')
+
+class DebtItem(db.Model):
+    __tablename__ = 'debt_items'
+    id = db.Column(db.Integer, primary_key=True)
+    debt_id = db.Column(db.Integer, db.ForeignKey('debts.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Float, nullable=False)
+    total_price = db.Column(db.Float, nullable=False)
+
+    product = db.relationship('Product')
+
+class DebtPayment(db.Model):
+    __tablename__ = 'debt_payments'
+    id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.Integer, db.ForeignKey('debtors.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    payment_date = db.Column(db.DateTime, default=datetime.utcnow)
+    payment_method = db.Column(db.String(50)) # cash, mpesa, bank
+    reference = db.Column(db.String(100))

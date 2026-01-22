@@ -1,0 +1,98 @@
+{% extends "layouts/base.html" %}
+{% block title %}Manage Debtors{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2"><i class="bi bi-people"></i> Debtors Management</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDebtorModal">
+                <i class="bi bi-person-plus"></i> Add New Debtor
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th class="text-end">Current Balance (KES)</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for debtor in debtors %}
+                        <tr>
+                            <td><strong>{{ debtor.name }}</strong></td>
+                            <td>{{ debtor.phone or '-' }}</td>
+                            <td>{{ debtor.email or '-' }}</td>
+                            <td class="text-end fw-bold {{ 'text-danger' if debtor.total_debt > 0 else 'text-success' }}">
+                                {{ "%.2f"|format(debtor.total_debt) }}
+                            </td>
+                            <td class="text-center">
+                                {% if debtor.total_debt > 0 %}
+                                <span class="badge bg-warning text-dark">Owing</span>
+                                {% else %}
+                                <span class="badge bg-success">Clear</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('debtor_details', debtor_id=debtor.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View & Pay
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">No debtors found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Debtor Modal -->
+<div class="modal fade" id="addDebtorModal" tabindex="-1" aria-labelledby="addDebtorModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('manage_debtors') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addDebtorModalLabel">Add New Debtor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="text" class="form-control" name="phone">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-control" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Address / Details</label>
+                        <textarea class="form-control" name="address" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Debtor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

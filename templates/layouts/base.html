@@ -37,6 +37,14 @@
                             </a>
                         </li>
                         {% endif %}
+
+                        {% if session['role'] in ['manager', 'admin', 'cashier'] %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'debtors' in request.endpoint %}active{% endif %}" href="{{ url_for('manage_debtors') }}">
+                                <i class="fas fa-user-tag"></i> Debtors (Credit Sales)
+                            </a>
+                        </li>
+                        {% endif %}
                         
                         {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">

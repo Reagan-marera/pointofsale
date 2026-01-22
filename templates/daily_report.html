@@ -27,16 +27,24 @@
 </div>
 
 <div class="row">
-    <div class="col-md-{% if session['role'] in ['admin', 'manager'] %}4{% else %}12{% endif %}">
+    <div class="col-md-3">
         <div class="card text-white bg-success mb-3">
-            <div class="card-header">Total Sales</div>
+            <div class="card-header">Direct Sales</div>
             <div class="card-body">
                 <h5 class="card-title">KSh {{ "%.2f"|format(total_sales) }}</h5>
             </div>
         </div>
     </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-header">Debt Collections</div>
+            <div class="card-body">
+                <h5 class="card-title">KSh {{ "%.2f"|format(debt_collections) }}</h5>
+            </div>
+        </div>
+    </div>
     {% if session['role'] in ['admin', 'manager'] %}
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-white bg-danger mb-3">
             <div class="card-header">Total Expenses</div>
             <div class="card-body">
@@ -44,7 +52,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-white bg-primary mb-3">
             <div class="card-header">Net Profit</div>
             <div class="card-body">
