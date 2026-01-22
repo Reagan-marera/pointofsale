@@ -24,7 +24,9 @@ class KenyaBankService:
 
     def __init__(self, gateway_config=None):
         self.config = gateway_config or {}
-        self.simulation_mode = self.config.get('test_mode', True)
+        # Simulation mode is only True if explicitly requested OR if keys are missing
+        self.is_sandbox = self.config.get('test_mode', True)
+        self.simulation_mode = self.config.get('simulate', False) or not self.config.get('api_key')
 
     def get_mpesa_access_token(self):
         """Get access token from Safaricom Daraja API"""
@@ -34,8 +36,9 @@ class KenyaBankService:
         consumer_key = self.config.get('api_key')
         consumer_secret = self.config.get('api_secret')
 
-        api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
-        if not self.simulation_mode:
+        if self.is_sandbox:
+            api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+        else:
             api_url = "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
 
         try:
@@ -69,7 +72,11 @@ class KenyaBankService:
 
         password = base64.b64encode(f"{business_short_code}{passkey}{timestamp}".encode()).decode()
 
-        api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+        if self.is_sandbox:
+            api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+        else:
+            api_url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
         callback_url = self.config.get('callback_url', "https://example.com/api/mpesa/callback")
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -88,9 +95,12 @@ class KenyaBankService:
         }
 
         try:
+            logger.info(f"Calling M-Pesa API: {api_url}")
             res = requests.post(api_url, json=payload, headers=headers)
+            logger.info(f"M-Pesa Response: {res.status_code} - {res.text}")
             return res.json()
         except Exception as e:
+            logger.error(f"M-Pesa API Error: {e}")
             return {'success': False, 'error': str(e)}
 
     def check_bank_transfer_status(self, transaction_ref):
@@ -198,7 +208,11 @@ class KenyaBankService:
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
         password = base64.b64encode(f"{business_short_code}{passkey}{timestamp}".encode()).decode()
 
-        api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query"
+        if self.is_sandbox:
+            api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query"
+        else:
+            api_url = "https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query"
+
         headers = {"Authorization": f"Bearer {access_token}"}
         payload = {
             "BusinessShortCode": business_short_code,

@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category,BankTransaction,BankAccount,PaymentGateway,BankAPIConnection
+from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category,BankTransaction,BankAccount,PaymentGateway,BankAPIConnection, Debtor, Debt, DebtItem, DebtPayment
 from datetime import datetime,timedelta
 from kenya_bank_service import KenyaBankService
 import random
@@ -520,6 +520,9 @@ def daily_report():
     # Calculate total sales
     total_sales = sales_query.with_entities(func.sum(Sale.total_amount)).scalar() or 0
 
+    # Calculate debt collections
+    debt_collections = db.session.query(func.sum(DebtPayment.amount)).filter(func.date(DebtPayment.payment_date) == date).scalar() or 0
+
     # Initialize values for all roles
     total_expenses = 0
     net_profit = 0
@@ -548,6 +551,7 @@ def daily_report():
 
     return render_template('daily_report.html',
                          total_sales=total_sales,
+                         debt_collections=debt_collections,
                          total_expenses=total_expenses,
                          net_profit=net_profit,
                          date=date_str if date_str else date.strftime('%Y-%m-%d'))
@@ -2927,5 +2931,201 @@ def disconnect_bank(connection_id):
     
     flash(f'Disconnected from {connection.bank_name}', 'success')
     return redirect(url_for('list_bank_connections'))
+
+# ======================
+# DEBTORS MODULE
+# ======================
+
+@app.route('/debtors', methods=['GET', 'POST'])
+@login_required(roles=['manager', 'admin', 'cashier'])
+def manage_debtors():
+    """List and manage debtors"""
+    if request.method == 'POST':
+        name = request.form.get('name')
+        phone = request.form.get('phone')
+        email = request.form.get('email')
+        address = request.form.get('address')
+
+        if not name:
+            flash('Debtor name is required', 'danger')
+            return redirect(url_for('manage_debtors'))
+
+        debtor = Debtor(name=name, phone=phone, email=email, address=address)
+        db.session.add(debtor)
+        db.session.commit()
+        flash(f'Debtor {name} added successfully!', 'success')
+        return redirect(url_for('manage_debtors'))
+
+    debtors = Debtor.query.order_by(Debtor.name).all()
+    return render_template('debtors/list.html', debtors=debtors)
+
+@app.route('/debtors/<int:debtor_id>')
+@login_required(roles=['manager', 'admin', 'cashier'])
+def debtor_details(debtor_id):
+    """View debtor details, history, and record payments"""
+    debtor = Debtor.query.get_or_404(debtor_id)
+    return render_template('debtors/view.html', debtor=debtor)
+
+@app.route('/api/debtors/add_debt', methods=['POST'])
+@login_required(roles=['manager', 'admin', 'cashier'])
+def api_add_debt():
+    """Record a new debt for a person"""
+    try:
+        data = request.get_json()
+        debtor_id = data.get('debtor_id')
+        items = data.get('items', [])
+
+        if not items:
+            return jsonify({'success': False, 'error': 'No items selected'}), 400
+
+        debtor = Debtor.query.get(debtor_id)
+        if not debtor:
+            return jsonify({'success': False, 'error': 'Debtor not found'}), 404
+
+        total_amount = 0
+        subtotal = 0
+        tax = 0
+
+        # We'll calculate totals first to create the Sale object
+        for item in items:
+            product = Product.query.get(item['id'])
+            if not product or product.current_stock < item['quantity']:
+                return jsonify({'success': False, 'error': f"Insufficient stock for {product.name}"}), 400
+            item_total = product.selling_price * item['quantity']
+            subtotal += item_total
+            if product.vatable and product.tax_rate:
+                tax += item_total * product.tax_rate
+
+        total_amount = subtotal + tax
+
+        # Create a Sale record for unified reporting
+        sale = Sale(
+            receipt_number=Sale.generate_receipt_number(),
+            user_id=session['user_id'],
+            subtotal=subtotal,
+            tax_amount=tax,
+            total_amount=total_amount,
+            payment_method='credit',
+            payment_status='pending',
+            location_id=session.get('location_id')
+        )
+        db.session.add(sale)
+        db.session.flush()
+
+        debt = Debt(debtor_id=debtor_id, total_amount=total_amount, remaining_amount=total_amount, sale_id=sale.id)
+        db.session.add(debt)
+        db.session.flush() # Get debt.id
+
+        for item in items:
+            product = Product.query.get(item['id'])
+            item_total = product.selling_price * item['quantity']
+
+            # Create SaleItem
+            sale_item = SaleItem(
+                sale_id=sale.id,
+                product_id=product.id,
+                quantity=item['quantity'],
+                unit_price=product.selling_price,
+                total_price=item_total
+            )
+            db.session.add(sale_item)
+
+            debt_item = DebtItem(
+                debt_id=debt.id,
+                product_id=product.id,
+                quantity=item['quantity'],
+                unit_price=product.selling_price,
+                total_price=item_total
+            )
+            db.session.add(debt_item)
+
+            # Update stock
+            product.current_stock -= item['quantity']
+            movement = InventoryMovement(
+                product_id=product.id,
+                movement_type='debt_issue',
+                quantity=-item['quantity'],
+                reference_id=debt.id,
+                notes=f"Debt issued to {debtor.name}"
+            )
+            db.session.add(movement)
+
+        debtor.total_debt += total_amount
+
+        db.session.commit()
+        return jsonify({'success': True, 'debt_id': debt.id, 'total': total_amount})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/debtors/payment', methods=['POST'])
+@login_required(roles=['manager', 'admin', 'cashier'])
+def api_debtor_payment():
+    """Record a payment from a debtor"""
+    try:
+        data = request.get_json()
+        debtor_id = data.get('debtor_id')
+        amount = float(data.get('amount'))
+        payment_method = data.get('payment_method', 'cash')
+        reference = data.get('reference', '')
+
+        debtor = Debtor.query.get_or_404(debtor_id)
+
+        payment = DebtPayment(
+            debtor_id=debtor_id,
+            amount=amount,
+            payment_method=payment_method,
+            reference=reference
+        )
+        db.session.add(payment)
+
+        # Deduct from balance
+        debtor.total_debt -= amount
+        if debtor.total_debt < 0:
+            debtor.total_debt = 0 # Prevent negative debt (prepayment)
+
+        # Allocate payment to debts (oldest first)
+        remaining_payment = amount
+        active_debts = Debt.query.filter_by(debtor_id=debtor_id).filter(Debt.remaining_amount > 0).order_by(Debt.date.asc()).all()
+
+        for debt in active_debts:
+            if remaining_payment <= 0:
+                break
+
+            if remaining_payment >= debt.remaining_amount:
+                remaining_payment -= debt.remaining_amount
+                debt.remaining_amount = 0
+                debt.status = 'paid'
+                # Update linked sale if exists
+                if debt.sale_id:
+                    sale = Sale.query.get(debt.sale_id)
+                    if sale:
+                        sale.payment_status = 'completed'
+            else:
+                debt.remaining_amount -= remaining_payment
+                remaining_payment = 0
+                debt.status = 'partial'
+
+        # If it was a bank/mpesa payment, record a bank transaction too
+        if payment_method in ['bank_transfer', 'mpesa']:
+            bank_txn = BankTransaction(
+                transaction_ref=f"DEBT-PAY-{payment.id}",
+                amount=amount,
+                transaction_type='deposit',
+                description=f"Debt payment from {debtor.name}",
+                status='completed',
+                payment_method=payment_method,
+                transaction_date=datetime.utcnow()
+            )
+            db.session.add(bank_txn)
+
+        db.session.commit()
+        return jsonify({'success': True, 'new_balance': debtor.total_debt})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
