@@ -85,7 +85,7 @@ class KenyaBankService:
             "Password": password,
             "Timestamp": timestamp,
             "TransactionType": "CustomerPayBillOnline",
-            "Amount": int(amount),
+            "Amount": int(round(float(amount))),
             "PartyA": phone_number,
             "PartyB": business_short_code,
             "PhoneNumber": phone_number,

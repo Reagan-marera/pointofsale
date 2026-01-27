@@ -76,12 +76,16 @@
                                     <th class="text-end">Total (KES)</th>
                                     <th class="text-end">Balance (KES)</th>
                                     <th class="text-center">Status</th>
+                                    <th class="text-end">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for debt in debtor.debts|sort(attribute='date', reverse=True) %}
                                 <tr>
-                                    <td>{{ debt.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <div class="fw-bold">{{ debt.date.strftime('%Y-%m-%d') }}</div>
+                                        <small class="text-muted">{{ debt.date.strftime('%H:%M') }}</small>
+                                    </td>
                                     <td>
                                         <ul class="list-unstyled mb-0 small">
                                         {% for item in debt.items %}
@@ -99,6 +103,11 @@
                                         {% else %}
                                         <span class="badge bg-warning text-dark">Pending</span>
                                         {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{{ url_for('credit_receipt', debt_id=debt.id) }}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-printer"></i> Receipt
+                                        </a>
                                     </td>
                                 </tr>
                                 {% else %}

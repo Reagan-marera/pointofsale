@@ -2966,6 +2966,14 @@ def debtor_details(debtor_id):
     debtor = Debtor.query.get_or_404(debtor_id)
     return render_template('debtors/view.html', debtor=debtor)
 
+@app.route('/debtors/receipt/<int:debt_id>')
+@login_required(roles=['manager', 'admin', 'cashier'])
+def credit_receipt(debt_id):
+    """Printable receipt for a specific credit sale"""
+    debt = Debt.query.get_or_404(debt_id)
+    total_paid_by_debtor = db.session.query(func.sum(DebtPayment.amount)).filter(DebtPayment.debtor_id == debt.debtor_id).scalar() or 0
+    return render_template('debtors/receipt.html', debt=debt, total_paid_by_debtor=total_paid_by_debtor)
+
 @app.route('/api/debtors/add_debt', methods=['POST'])
 @login_required(roles=['manager', 'admin', 'cashier'])
 def api_add_debt():
