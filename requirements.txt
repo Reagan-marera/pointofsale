@@ -6,3 +6,5 @@ SQLAlchemy==2.0.42
 Werkzeug==2.2.3
 alembic==1.14.1
 requests
+pandas
+openpyxl

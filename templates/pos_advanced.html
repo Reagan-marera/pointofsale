@@ -3,9 +3,9 @@
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2"><i class="bi bi-bank"></i> Integrated Bank & M-Pesa POS</h1>
+        <h1 class="h2"><i class="bi bi-phone-vibrate"></i> Advanced POS (M-Pesa)</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
-            <span class="badge bg-success p-2"><i class="bi bi-shield-check"></i> Secure Bank API Connected</span>
+            <span class="badge bg-success p-2"><i class="bi bi-shield-check"></i> M-Pesa API Integrated</span>
         </div>
     </div>
     <div class="row">
@@ -70,35 +70,8 @@
                         <label class="form-label">Payment Method</label>
                         <select class="form-select" id="paymentMethod" onchange="togglePaymentOptions()">
                             <option value="cash">Cash</option>
-                            <option value="card">Credit/Debit Card</option>
-                            <option value="mobile_money">Mobile Money (M-Pesa STK Push)</option>
-                            <option value="bank_transfer">Bank Transfer (Direct API)</option>
-                            <option value="split">Split Payment</option>
+                            <option value="mobile_money">M-Pesa STK Push</option>
                         </select>
-                    </div>
-                    
-                    
-                    <!-- Bank Account Selection -->
-                    <div class="mb-3" id="bankAccountSection" style="display: none;">
-                        <label class="form-label">Bank Account</label>
-                        <select class="form-select" id="bankAccount">
-                            {% for account in bank_accounts %}
-                            <option value="{{ account.id }}">{{ account.bank_name }} - {{ account.account_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <!-- Split Payment Section -->
-                    <div class="mb-3" id="splitPaymentSection" style="display: none;">
-                        <label class="form-label">Split Payment</label>
-                        <div class="input-group mb-2">
-                            <span class="input-group-text">Cash</span>
-                            <input type="number" class="form-control" id="cashAmount" placeholder="Amount">
-                        </div>
-                        <div class="input-group">
-                            <span class="input-group-text">Card</span>
-                            <input type="number" class="form-control" id="cardAmount" placeholder="Amount">
-                        </div>
                     </div>
 
                     <!-- M-Pesa Section -->
@@ -193,6 +166,7 @@ function addToCart(productId, productName, price) {
             id: productId,
             name: productName,
             price: price,
+            base_price: price,
             quantity: 1
         });
     }
@@ -217,7 +191,11 @@ function updateCartDisplay() {
         cartBody.innerHTML += `
             <tr>
                 <td>${item.name}</td>
-                <td>${item.price.toFixed(2)}</td>
+                <td>
+                    <input type="number" class="form-control form-control-sm price-input"
+                           value="${item.price.toFixed(2)}" step="0.01" min="${item.base_price}"
+                           onchange="updatePrice(${index}, this.value)">
+                </td>
                 <td>
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary" type="button" 
@@ -246,6 +224,17 @@ function updateCartDisplay() {
     document.getElementById('total').textContent = total.toFixed(2);
 }
 
+function updatePrice(index, newPrice) {
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price < cart[index].base_price) {
+        alert(`Price cannot be below KES ${cart[index].base_price.toFixed(2)}`);
+        updateCartDisplay();
+        return;
+    }
+    cart[index].price = price;
+    updateCartDisplay();
+}
+
 function updateQuantity(index, change) {
     cart[index].quantity += change;
     if (cart[index].quantity <= 0) {
@@ -266,12 +255,8 @@ function clearCart() {
 
 function togglePaymentOptions() {
     const method = document.getElementById('paymentMethod').value;
-    const bankSection = document.getElementById('bankAccountSection');
-    const splitSection = document.getElementById('splitPaymentSection');
     const mpesaSection = document.getElementById('mpesaSection');
     
-    bankSection.style.display = method === 'bank_transfer' ? 'block' : 'none';
-    splitSection.style.display = method === 'split' ? 'block' : 'none';
     mpesaSection.style.display = method === 'mobile_money' ? 'block' : 'none';
 }
 
@@ -347,16 +332,19 @@ function processPayment() {
     const paymentMethod = document.getElementById('paymentMethod').value;
     const customerEmail = document.getElementById('customerEmail').value;
     
+    if (paymentMethod === 'mobile_money') {
+        const phone = document.getElementById('mpesaPhone').value;
+        if (!phone) {
+            showNotification('Please enter M-Pesa phone number and trigger STK Push first', 'warning');
+            return;
+        }
+        // STK Push should have been triggered already
+        showNotification('Please use "Send STK Push" and wait for confirmation', 'info');
+        return;
+    }
+
     showPaymentStatus('Processing payment...', 'info');
-    
-    // For bank transfers
-    if (paymentMethod === 'bank_transfer') {
-        processBankTransfer(customerEmail);
-    }
-    // For cash, card (manual), mobile_money (manual)
-    else {
-        processManualPayment(paymentMethod, customerEmail);
-    }
+    processManualPayment(paymentMethod, customerEmail);
 }
 
 function processManualPayment(method, email) {
@@ -385,33 +373,6 @@ function processManualPayment(method, email) {
     });
 }
 
-function processBankTransfer(email) {
-    const bankAccountId = document.getElementById('bankAccount').value;
-    
-    fetch('/api/sale/create_with_payment', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            items: cart,
-            payment_method: 'bank_transfer',
-            customer_email: email,
-            bank_account_id: bankAccountId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showPaymentStatus('Bank transfer initiated!', 'success');
-            printReceipt(data.receipt_number);
-            showBankDetails(data.bank_details);
-        } else {
-            showPaymentStatus(`Error: ${data.error}`, 'danger');
-        }
-    });
-}
-
 
 function showPaymentStatus(message, type) {
     const statusDiv = document.getElementById('paymentStatus');
@@ -425,41 +386,6 @@ function showPaymentStatus(message, type) {
             <h5 class="mt-2">${message}</h5>
         </div>
     `;
-}
-
-function showBankDetails(details) {
-    const modalHtml = `
-        <div class="modal fade" id="bankDetailsModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Bank Transfer Details</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-info">
-                            <h6>Please transfer the exact amount to:</h6>
-                            <p class="mb-1"><strong>Bank:</strong> ${details.bank_name}</p>
-                            <p class="mb-1"><strong>Account Name:</strong> ${details.account_name}</p>
-                            <p class="mb-1"><strong>Account Number:</strong> ${details.account_number}</p>
-                            <p class="mb-1"><strong>Amount:</strong> KES ${cartTotal.toFixed(2)}</p>
-                            <p class="mb-0"><strong>Reference:</strong> ${details.reference}</p>
-                        </div>
-                        <p class="text-muted">
-                            Your order will be confirmed once payment is received.
-                        </p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modal = new bootstrap.Modal(document.getElementById('bankDetailsModal'));
-    modal.show();
 }
 
 function printReceipt(receiptNumber) {

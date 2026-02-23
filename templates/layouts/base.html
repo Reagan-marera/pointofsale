@@ -117,7 +117,7 @@
                         {% if session['role'] in ['admin', 'manager'] %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'pos_advanced' %}active{% endif %}" href="{{ url_for('pos_advanced') }}">
-                                <i class="fas fa-university"></i> Bank Integrated POS
+                                <i class="fas fa-mobile-alt"></i> Advanced POS (M-Pesa)
                             </a>
                         </li>
                         {% endif %}
@@ -128,31 +128,16 @@
                         </li>
                         {% endif %}
                         
-                       <!-- ======== BANK & PAYMENTS SECTION ======== -->
+                       <!-- ======== INTEGRATION SECTION ======== -->
 {% if session['role'] in ['admin', 'manager'] %}
 <li class="nav-item">
     <div class="nav-link text-muted small" style="padding-top: 1rem;">
-        <i class="fas fa-university"></i> BANK & PAYMENTS
+        <i class="fas fa-cog"></i> SETTINGS
     </div>
 </li>
 <li class="nav-item">
-    <a class="nav-link {% if request.endpoint == 'bank_connect' %}active{% endif %}" href="{{ url_for('bank_connect') }}">
-        <i class="fas fa-plug"></i> Connect New Bank
-    </a>
-</li>
-<li class="nav-item">
-    <a class="nav-link {% if request.endpoint == 'list_bank_connections' %}active{% endif %}" href="{{ url_for('list_bank_connections') }}">
-        <i class="fas fa-list"></i> API Connections
-    </a>
-</li>
-<li class="nav-item">
-    <a class="nav-link {% if request.endpoint == 'manage_bank_accounts' %}active{% endif %}" href="{{ url_for('manage_bank_accounts') }}">
-        <i class="fas fa-landmark"></i> Physical Accounts
-    </a>
-</li>
-<li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'bank_settings' %}active{% endif %}" href="{{ url_for('bank_settings') }}">
-        <i class="fas fa-cog"></i> API Gateway Config
+        <i class="fas fa-mobile-alt"></i> M-Pesa Integration
     </a>
 </li>
 {% endif %}
@@ -211,13 +196,6 @@
                         </li>
                         {% endif %}
                         
-                        {% if session['role'] in ['admin', 'manager'] %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'bank_reconciliation_report' %}active{% endif %}" href="{{ url_for('bank_reconciliation_report') }}">
-                                <i class="fas fa-balance-scale"></i> Bank Reconciliation
-                            </a>
-                        </li>
-                        {% endif %}
                         
                         
                         {% if session.role in ['manager', 'admin', 'cashier'] %}
