@@ -336,6 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         id: data.id,
                         name: data.name,
                         price: data.price,
+                        base_price: data.price,
                         quantity: 1,
                         stock: data.stock
                     });
@@ -361,7 +362,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${item.name} <small class="text-muted">(Stock: ${item.stock})</small></td>
-                <td>KSh ${parseFloat(item.price).toFixed(2)}</td>
+                <td>
+                    <input type="number"
+                           class="form-control form-control-sm price-input"
+                           step="0.01"
+                           min="${item.base_price}"
+                           value="${parseFloat(item.price).toFixed(2)}"
+                           data-index="${index}">
+                </td>
                 <td>
                     <input type="number"
                            class="form-control form-control-sm qty-input"
@@ -379,6 +387,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 </td>
             `;
             cartItems.appendChild(row);
+        });
+
+        // Add event listeners for price changes
+        document.querySelectorAll('.price-input').forEach(input => {
+            input.addEventListener('change', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                const newPrice = parseFloat(this.value);
+                updatePrice(index, newPrice);
+            });
         });
 
         // Add event listeners for quantity changes
@@ -406,6 +423,20 @@ document.addEventListener('DOMContentLoaded', function() {
         subtotalEl.textContent = `KSh ${subtotal.toFixed(2)}`;
         taxEl.textContent = `KSh ${tax.toFixed(2)}`;
         totalEl.textContent = `KSh ${total.toFixed(2)}`;
+    }
+
+    function updatePrice(index, newPrice) {
+        const price = parseFloat(newPrice);
+        const item = cart[index];
+
+        if (isNaN(price) || price < item.base_price) {
+            alert(`Price cannot be below KES ${item.base_price.toFixed(2)}.`);
+            updateCartDisplay();
+            return;
+        }
+
+        item.price = price;
+        updateCartDisplay();
     }
 
     function updateQuantity(index, newQuantity) {

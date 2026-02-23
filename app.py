@@ -1,10 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category,BankTransaction,BankAccount,PaymentGateway,BankAPIConnection, Debtor, Debt, DebtItem, DebtPayment
+from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, SupplierQuotation, SupplierQuotationItem, Item, Category,BankTransaction,PaymentGateway, Debtor, Debt, DebtItem, DebtPayment
 from datetime import datetime,timedelta
 from kenya_bank_service import KenyaBankService
 import random
 import json
+import pandas as pd
 from sqlalchemy.orm import joinedload
 import string
 from config import Config
@@ -853,6 +854,111 @@ def add_product():
     redirect_url = request.args.get('redirect_url')
     return render_template('add_product.html', suppliers=suppliers, dealers=dealers, items=items, categories=categories, name=name, redirect_url=redirect_url)
 
+@app.route('/products/upload_excel', methods=['POST'])
+@login_required(roles=['manager', 'admin'])
+def upload_products_excel():
+    if 'file' not in request.files:
+        flash('No file part', 'danger')
+        return redirect(url_for('products'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash('No selected file', 'danger')
+        return redirect(url_for('products'))
+
+    if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+        try:
+            df = pd.read_excel(file)
+
+            # Required columns mapping
+            # Expected columns in Excel: Barcode, Name, Category, Buying Price, Selling Price, Stock, Min Stock, Supplier, Dealer, Vatable
+            required_columns = ['Barcode', 'Name', 'Category', 'Buying Price', 'Selling Price', 'Stock', 'Min Stock', 'Supplier', 'Dealer', 'Vatable']
+
+            # Check if required columns exist
+            missing_cols = [col for col in required_columns if col not in df.columns]
+            if missing_cols:
+                flash(f'Missing columns in Excel: {", ".join(missing_cols)}', 'danger')
+                return redirect(url_for('products'))
+
+            success_count = 0
+            update_count = 0
+            errors = []
+
+            for index, row in df.iterrows():
+                try:
+                    barcode = str(row['Barcode']).strip()
+                    name = str(row['Name']).strip()
+                    category = str(row['Category']).strip()
+                    buying_price = float(row['Buying Price'])
+                    selling_price = float(row['Selling Price'])
+                    stock = int(row['Stock'])
+                    min_stock = int(row['Min Stock'])
+                    supplier_name = str(row['Supplier']).strip()
+                    dealer_name = str(row['Dealer']).strip()
+                    vatable = str(row['Vatable']).strip().lower() in ['yes', 'true', '1', 'y']
+
+                    # Lookup supplier and dealer
+                    supplier = Supplier.query.filter(Supplier.name.ilike(supplier_name)).first()
+                    dealer = Dealer.query.filter(Dealer.name.ilike(dealer_name)).first()
+
+                    if not supplier:
+                        errors.append(f"Row {index+2}: Supplier '{supplier_name}' not found.")
+                        continue
+                    if not dealer:
+                        errors.append(f"Row {index+2}: Dealer '{dealer_name}' not found.")
+                        continue
+
+                    product = Product.query.filter_by(barcode=barcode).first()
+
+                    if product:
+                        # Update existing product
+                        product.name = name
+                        product.category = category
+                        product.buying_price = buying_price
+                        product.selling_price = selling_price
+                        product.current_stock = stock
+                        product.min_stock_level = min_stock
+                        product.supplier_id = supplier.id
+                        product.dealer_id = dealer.id
+                        product.vatable = vatable
+                        update_count += 1
+                    else:
+                        # Create new product
+                        new_product = Product(
+                            barcode=barcode,
+                            name=name,
+                            category=category,
+                            buying_price=buying_price,
+                            selling_price=selling_price,
+                            current_stock=stock,
+                            min_stock_level=min_stock,
+                            supplier_id=supplier.id,
+                            dealer_id=dealer.id,
+                            vatable=vatable
+                        )
+                        db.session.add(new_product)
+                        success_count += 1
+                except Exception as e:
+                    errors.append(f"Row {index+2}: {str(e)}")
+
+            db.session.commit()
+
+            msg = f"Successfully uploaded {success_count} new products and updated {update_count} existing products."
+            if errors:
+                msg += f" Encountered {len(errors)} errors."
+                flash(msg, 'warning')
+                for err in errors[:5]: # Show first 5 errors
+                    flash(err, 'danger')
+            else:
+                flash(msg, 'success')
+
+        except Exception as e:
+            flash(f'Error processing Excel file: {str(e)}', 'danger')
+    else:
+        flash('Invalid file format. Please upload an Excel file (.xlsx or .xls)', 'danger')
+
+    return redirect(url_for('products'))
+
 @app.route('/pos')
 @login_required(roles=['cashier', 'manager', 'admin'])
 def pos():
@@ -911,7 +1017,11 @@ def create_sale():
                 app.logger.warning(f"Checkout failed: Insufficient stock for product {item['id']}")
                 return jsonify({'error': f"Insufficient stock for {product.name}. Only {product.current_stock} left."}), 400
 
-            item_total = product.selling_price * item['quantity']
+            unit_price = float(item.get('price', product.selling_price))
+            if unit_price < product.selling_price:
+                return jsonify({'error': f"Price for {product.name} cannot be below KES {product.selling_price}."}), 400
+
+            item_total = unit_price * item['quantity']
             subtotal += item_total
             if product.vatable and product.tax_rate:
                 tax += item_total * product.tax_rate
@@ -2049,6 +2159,7 @@ def add_to_cart_simple():
             'id': product.id,
             'name': product.name,
             'price': product.selling_price,
+            'base_price': product.selling_price,
             'quantity': 1
         })
 
@@ -2290,14 +2401,14 @@ def profit_loss_report():
 @app.route('/bank/settings', methods=['GET', 'POST'])
 @login_required(roles=['admin', 'manager'])
 def bank_settings():
-    """Manage Bank and Mobile Money Integration Settings"""
-    gateways = ['mpesa', 'equity', 'kcb', 'coop']
+    """Manage M-Pesa Integration Settings"""
+    gateways = ['mpesa']
     gw_objects = {}
 
     for gw_name in gateways:
         gw = PaymentGateway.query.filter_by(name=gw_name).first()
         if not gw:
-            gw = PaymentGateway(name=gw_name, gateway_type='bank' if gw_name != 'mpesa' else 'mobile_money', is_active=False)
+            gw = PaymentGateway(name=gw_name, gateway_type='mobile_money', is_active=False)
             db.session.add(gw)
             db.session.commit()
         gw_objects[gw_name] = gw
@@ -2318,44 +2429,6 @@ def bank_settings():
             return redirect(url_for('bank_settings'))
 
     return render_template('bank/settings.html', **gw_objects)
-
-@app.route('/bank/accounts')
-@login_required(roles=['manager', 'admin'])
-def manage_bank_accounts():
-    """View all bank accounts"""
-    bank_accounts = BankAccount.query.order_by(BankAccount.is_primary.desc(), BankAccount.bank_name).all()
-    return render_template('bank/accounts.html', bank_accounts=bank_accounts)
-
-@app.route('/bank/accounts/add', methods=['GET', 'POST'])
-@login_required(roles=['manager', 'admin'])
-def add_bank_account():
-    """Add a new bank account"""
-    if request.method == 'POST':
-        try:
-            bank_account = BankAccount(
-                account_name=request.form['account_name'],
-                account_number=request.form['account_number'],
-                bank_name=request.form['bank_name'],
-                branch_code=request.form.get('branch_code'),
-                account_type=request.form.get('account_type', 'checking'),
-                currency=request.form.get('currency', 'KES'),
-                is_primary=request.form.get('is_primary') == 'on'
-            )
-            
-            # If setting as primary, unset others
-            if bank_account.is_primary:
-                BankAccount.query.update({'is_primary': False})
-            
-            db.session.add(bank_account)
-            db.session.commit()
-            
-            flash('Bank account added successfully!', 'success')
-            return redirect(url_for('manage_bank_accounts'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error adding bank account: {str(e)}', 'danger')
-    
-    return render_template('bank/add_account.html')
 
 # ======================
 # MPESA INTEGRATION
@@ -2438,153 +2511,6 @@ def mpesa_callback():
     # Real logic would update transaction status in DB
     return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'})
 
-@app.route('/api/bank/transfer', methods=['POST'])
-@login_required(roles=['manager', 'admin'])
-def bank_transfer():
-    """Initiate a bank transfer (B2C or inter-bank)"""
-    try:
-        data = request.get_json()
-        target = data.get('target') # phone or account number
-        amount = data.get('amount')
-        transfer_type = data.get('type', 'mpesa') # mpesa or bank
-
-        # Real implementation would use KenyaBankService
-        service = KenyaBankService({'test_mode': True})
-
-        if transfer_type == 'mpesa':
-            result = service.initiate_b2c_transfer(target, amount, "Payment")
-        else:
-            # Generic bank transfer logic
-            result = {'success': True, 'simulation': True}
-
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/sales/unreconciled', methods=['GET'])
-@login_required(roles=['manager', 'admin'])
-def get_unreconciled_sales():
-    """Get sales that haven't been reconciled with a bank transaction"""
-    amount = request.args.get('amount', type=float)
-
-    query = Sale.query.filter(Sale.payment_status == 'completed')
-
-    # Exclude sales that already have a reconciled bank transaction
-    reconciled_sale_ids = db.session.query(BankTransaction.sale_id).filter(BankTransaction.sale_id.isnot(None)).all()
-    reconciled_sale_ids = [r[0] for r in reconciled_sale_ids]
-
-    query = query.filter(Sale.id.notin_(reconciled_sale_ids))
-
-    if amount:
-        # Match roughly (within 1 unit) to account for rounding
-        query = query.filter(Sale.total_amount.between(amount - 1, amount + 1))
-
-    sales = query.order_by(Sale.sale_date.desc()).limit(20).all()
-
-    return jsonify([{
-        'id': s.id,
-        'receipt_number': s.receipt_number,
-        'total': s.total_amount,
-        'date': s.sale_date.strftime('%Y-%m-%d %H:%M')
-    } for s in sales])
-
-@app.route('/bank/reconcile/upload', methods=['POST'])
-@login_required(roles=['manager', 'admin'])
-def upload_bank_statement():
-    """Upload and parse a CSV bank statement"""
-    if 'file' not in request.files:
-        flash('No file part', 'danger')
-        return redirect(url_for('bank_reconciliation_report'))
-
-    file = request.files['file']
-    if file.filename == '':
-        flash('No selected file', 'danger')
-        return redirect(url_for('bank_reconciliation_report'))
-
-    if file and file.filename.endswith('.csv'):
-        import csv
-        import io
-
-        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
-        csv_input = csv.reader(stream)
-
-        count = 0
-        for row in csv_input:
-            # Skip header if it contains non-numeric amount
-            try:
-                # Expected format: Date, Reference, Description, Amount
-                date_str, ref, desc, amt_str = row[0], row[1], row[2], row[3]
-                amount = float(amt_str)
-
-                # Check if already exists
-                if not BankTransaction.query.filter_by(transaction_ref=ref).first():
-                    txn = BankTransaction(
-                        transaction_ref=ref,
-                        amount=amount,
-                        transaction_type='deposit' if amount > 0 else 'withdrawal',
-                        description=desc,
-                        status='pending',
-                        transaction_date=datetime.strptime(date_str, '%Y-%m-%d')
-                    )
-                    db.session.add(txn)
-                    count += 1
-            except (ValueError, IndexError):
-                continue
-
-        db.session.commit()
-        flash(f'Successfully imported {count} transactions.', 'success')
-
-    return redirect(url_for('bank_reconciliation_report'))
-
-@app.route('/api/bank/reconcile', methods=['POST'])
-@login_required(roles=['manager', 'admin'])
-def reconcile_transaction():
-    """Manually reconcile a bank transaction with a Sale or existing record"""
-    try:
-        data = request.get_json()
-        transaction_id = data.get('transaction_id')
-        sale_id = data.get('sale_id')
-        
-        bank_txn = BankTransaction.query.get(transaction_id)
-        if not bank_txn:
-            return jsonify({'success': False, 'error': 'Transaction not found'}), 404
-
-        if sale_id:
-            bank_txn.sale_id = sale_id
-            bank_txn.status = 'reconciled'
-            bank_txn.posted_date = datetime.utcnow()
-            db.session.commit()
-            return jsonify({'success': True})
-
-        system_record_id = data.get('system_record_id')
-        if system_record_id:
-            # Link to existing system record
-            bank_txn = BankTransaction.query.get(system_record_id)
-            if bank_txn:
-                bank_txn.status = 'reconciled'
-                bank_txn.posted_date = datetime.utcnow()
-                db.session.commit()
-                return jsonify({'success': True})
-        else:
-            # Create new system record from bank transaction
-            bank_txn = BankTransaction(
-                transaction_ref=f"BANK-{transaction_id}",
-                amount=data['amount'],
-                transaction_type='deposit' if data['amount'] > 0 else 'withdrawal',
-                description=data['description'],
-                status='reconciled',
-                transaction_date=datetime.strptime(data['date'], '%Y-%m-%d'),
-                posted_date=datetime.utcnow(),
-                transaction_data={'bank_reconciled': True, 'original_data': data}
-            )
-            db.session.add(bank_txn)
-            db.session.commit()
-        
-        return jsonify({'success': True, 'transaction_id': bank_txn.id})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 400
 
 # ======================
 # ENHANCED POS WITH PAYMENT OPTIONS
@@ -2595,11 +2521,9 @@ def reconcile_transaction():
 def pos_advanced():
     """POS with integrated payment options"""
     payment_gateways = PaymentGateway.query.filter_by(is_active=True).all()
-    bank_accounts = BankAccount.query.filter_by(is_active=True).all()
     
     return render_template('pos_advanced.html',
-                         payment_gateways=payment_gateways,
-                         bank_accounts=bank_accounts)
+                         payment_gateways=payment_gateways)
 
 @app.route('/api/sale/create_with_payment', methods=['POST'])
 @login_required(roles=['cashier', 'manager', 'admin'])
@@ -2622,7 +2546,11 @@ def create_sale_with_payment():
             if not product or product.current_stock < item['quantity']:
                 return jsonify({'error': f"Insufficient stock for {product.name}. Only {product.current_stock} left."}), 400
             
-            item_total = product.selling_price * item['quantity']
+            unit_price = float(item.get('price', product.selling_price))
+            if unit_price < product.selling_price:
+                return jsonify({'error': f"Price for {product.name} cannot be below KES {product.selling_price}."}), 400
+
+            item_total = unit_price * item['quantity']
             subtotal += item_total
             if product.vatable and product.tax_rate:
                 tax += item_total * product.tax_rate
@@ -2685,252 +2613,6 @@ def create_sale_with_payment():
 # FINANCIAL REPORTS WITH BANK DATA
 # ======================
 
-@app.route('/admin/reports/bank_reconciliation')
-@login_required(roles=['manager', 'admin'])
-def bank_reconciliation_report():
-    """Bank reconciliation report"""
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    
-    if start_date:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d')
-    else:
-        start_date = datetime.now() - timedelta(days=30)
-    
-    if end_date:
-        end_date = datetime.strptime(end_date, '%Y-%m-%d')
-    else:
-        end_date = datetime.now()
-    
-    # System transactions
-    system_transactions = BankTransaction.query.filter(
-        BankTransaction.transaction_date.between(start_date, end_date)
-    ).order_by(BankTransaction.transaction_date.desc()).all()
-    
-    # Bank API connections
-    connections = BankAPIConnection.query.filter_by(is_active=True).all()
-    
-    # Totals
-    total_deposits = db.session.query(func.sum(BankTransaction.amount)).filter(
-        BankTransaction.transaction_type == 'deposit',
-        BankTransaction.status == 'completed',
-        BankTransaction.transaction_date.between(start_date, end_date)
-    ).scalar() or 0
-    
-    total_withdrawals = db.session.query(func.sum(BankTransaction.amount)).filter(
-        BankTransaction.transaction_type == 'withdrawal',
-        BankTransaction.status == 'completed',
-        BankTransaction.transaction_date.between(start_date, end_date)
-    ).scalar() or 0
-    
-    unreconciled = BankTransaction.query.filter(
-        BankTransaction.status != 'reconciled',
-        BankTransaction.transaction_date.between(start_date, end_date)
-    ).count()
-    
-    return render_template('reports/bank_reconciliation.html',
-                         system_transactions=system_transactions,
-                         connections=connections,
-                         total_deposits=total_deposits,
-                         total_withdrawals=total_withdrawals,
-                         unreconciled=unreconciled,
-                         start_date=start_date.strftime('%Y-%m-%d'),
-                         end_date=end_date.strftime('%Y-%m-%d'))
-
-# ======================
-# BULK PAYMENT PROCESSING
-# ======================
-
-@app.route('/bank/payments/bulk', methods=['POST'])
-@login_required(roles=['manager', 'admin'])
-def process_bulk_payments():
-    """Process bulk payments to suppliers/expenses"""
-    try:
-        data = request.get_json()
-        payment_ids = data.get('payment_ids', [])  # Could be expense_ids, supplier_invoice_ids
-        bank_account_id = data['bank_account_id']
-        payment_method = data.get('payment_method', 'bank_transfer')
-        
-        bank_account = BankAccount.query.get(bank_account_id)
-        if not bank_account:
-            return jsonify({'error': 'Bank account not found'}), 400
-        
-        total_amount = 0
-        processed_payments = []
-        
-        # Process each payment
-        for payment_id in payment_ids:
-            # This would fetch the actual payable amount
-            # For now, using placeholder logic
-            amount = 1000  # Would be fetched from expense/supplier record
-            
-            # Create withdrawal transaction
-            transaction = BankTransaction(
-                transaction_ref=f"BULK-{datetime.now().strftime('%Y%m%d%H%M%S')}-{payment_id}",
-                bank_account_id=bank_account_id,
-                amount=-amount,  # Negative for withdrawal
-                transaction_type='withdrawal',
-                description=f'Bulk payment for ID: {payment_id}',
-                status='pending',
-                payment_method=payment_method,
-                transaction_date=datetime.utcnow()
-            )
-            
-            db.session.add(transaction)
-            total_amount += amount
-            processed_payments.append({
-                'payment_id': payment_id,
-                'amount': amount,
-                'transaction_id': transaction.id
-            })
-        
-        # In real implementation, you would:
-        # 1. Generate payment file (ACH, SEPA, SWIFT)
-        # 2. Send to bank via API
-        # 3. Update status based on response
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Processed {len(processed_payments)} payments totaling {total_amount:.2f}',
-            'total_amount': total_amount,
-            'processed_payments': processed_payments
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500   
-    
-# ======================
-# KENYA BANK INTEGRATION
-# ======================
-
-@app.route('/bank/connect', methods=['GET'])
-@login_required(roles=['manager', 'admin'])
-def bank_connect():
-    """Bank connection page"""
-    banks = KenyaBankService.get_bank_list()
-    return render_template('bank/connect.html',
-                         banks=banks,
-                         title="Connect Bank Account")
-
-@app.route('/api/bank/connect', methods=['POST'])
-@login_required(roles=['manager', 'admin'])
-def api_bank_connect():
-    """API to connect bank"""
-    try:
-        data = request.get_json()
-        bank_id = data.get('bank_id')
-        account_number = data.get('account_number')
-        
-        if not bank_id or not account_number:
-            return jsonify({'success': False, 'error': 'Bank and account number required'})
-        
-        service = KenyaBankService({'test_mode': True})
-        result = service.connect_bank(bank_id, account_number)
-        
-        if not result.get('success'):
-            return jsonify(result)
-
-        # Save to database
-        connection = BankAPIConnection(
-            bank_name=result['bank_name'],
-            account_number=result['account_number'],
-            connection_type='api',
-            connection_data=result,
-            is_active=True,
-            user_id=session['user_id']
-        )
-        db.session.add(connection)
-        db.session.commit()
-        
-        result['db_id'] = connection.id
-        return jsonify(result)
-        
-    except Exception as e:
-        app.logger.error(f"Error connecting bank: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/bank/transactions/<int:connection_id>')
-@login_required(roles=['manager', 'admin'])
-def bank_transactions(connection_id):
-    """View bank transactions"""
-    connection = BankAPIConnection.query.get_or_404(connection_id)
-    
-    # Verify ownership
-    if connection.user_id != session['user_id'] and session['role'] not in ['admin', 'manager']:
-        flash('Access denied', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    service = KenyaBankService({'test_mode': True})
-    transactions = service.get_transactions(days=30)
-
-    # Generate some summary stats for the UI
-    summary = {
-        'current_balance': 150000.00,
-        'available_balance': 145000.00,
-        'ledger_balance': 150000.00,
-        'currency': 'KES',
-        'account_status': 'Active',
-        'last_updated': datetime.now().isoformat()
-    }
-    stats = {
-        'month_deposits': 50000.00,
-        'month_withdrawals': 30000.00,
-        'average_monthly_balance': 100000.00,
-        'transactions_this_month': 25
-    }
-
-    return render_template('bank/transactions.html',
-                         connection=connection,
-                         transactions=transactions['transactions'],
-                         summary=summary,
-                         stats=stats)
-
-@app.route('/api/bank/transactions/<int:connection_id>')
-@login_required(roles=['manager', 'admin'])
-def api_bank_transactions(connection_id):
-    """API to get bank transactions"""
-    days = request.args.get('days', 30, type=int)
-    service = KenyaBankService({'test_mode': True})
-    result = service.get_transactions(days=days)
-    return jsonify(result)
-
-@app.route('/bank/connections')
-@login_required(roles=['manager', 'admin'])
-def list_bank_connections():
-    """List all bank connections"""
-    from models import BankAPIConnection
-    
-    if session['role'] in ['admin', 'manager']:
-        connections = BankAPIConnection.query.filter_by(is_active=True).all()
-    else:
-        connections = BankAPIConnection.query.filter_by(
-            user_id=session['user_id'], 
-            is_active=True
-        ).all()
-    
-    return render_template('bank/connections.html', connections=connections)
-
-@app.route('/bank/disconnect/<int:connection_id>', methods=['POST'])
-@login_required(roles=['manager', 'admin'])
-def disconnect_bank(connection_id):
-    """Disconnect a bank account"""
-    from models import BankAPIConnection
-    
-    connection = BankAPIConnection.query.get_or_404(connection_id)
-    
-    # Verify ownership
-    if connection.user_id != session['user_id'] and session['role'] not in ['admin', 'manager']:
-        flash('Access denied', 'danger')
-        return redirect(url_for('list_bank_connections'))
-    
-    connection.is_active = False
-    db.session.commit()
-    
-    flash(f'Disconnected from {connection.bank_name}', 'success')
-    return redirect(url_for('list_bank_connections'))
 
 # ======================
 # DEBTORS MODULE
@@ -2991,7 +2673,12 @@ def api_add_debt():
             product = Product.query.get(item['id'])
             if not product or product.current_stock < item['quantity']:
                 return jsonify({'success': False, 'error': f"Insufficient stock for {product.name}"}), 400
-            item_total = product.selling_price * item['quantity']
+
+            unit_price = float(item.get('price', product.selling_price))
+            if unit_price < product.selling_price:
+                return jsonify({'success': False, 'error': f"Price for {product.name} cannot be below KES {product.selling_price}."}), 400
+
+            item_total = unit_price * item['quantity']
             subtotal += item_total
             if product.vatable and product.tax_rate:
                 tax += item_total * product.tax_rate
@@ -3018,14 +2705,15 @@ def api_add_debt():
 
         for item in items:
             product = Product.query.get(item['id'])
-            item_total = product.selling_price * item['quantity']
+            unit_price = float(item.get('price', product.selling_price))
+            item_total = unit_price * item['quantity']
 
             # Create SaleItem
             sale_item = SaleItem(
                 sale_id=sale.id,
                 product_id=product.id,
                 quantity=item['quantity'],
-                unit_price=product.selling_price,
+                unit_price=unit_price,
                 total_price=item_total
             )
             db.session.add(sale_item)
@@ -3034,7 +2722,7 @@ def api_add_debt():
                 debt_id=debt.id,
                 product_id=product.id,
                 quantity=item['quantity'],
-                unit_price=product.selling_price,
+                unit_price=unit_price,
                 total_price=item_total
             )
             db.session.add(debt_item)
@@ -3107,8 +2795,8 @@ def api_debtor_payment():
                 remaining_payment = 0
                 debt.status = 'partial'
 
-        # If it was a bank/mpesa payment, record a bank transaction too
-        if payment_method in ['bank_transfer', 'mpesa']:
+        # If it was an mpesa payment, record a transaction too
+        if payment_method == 'mpesa':
             bank_txn = BankTransaction(
                 transaction_ref=f"DEBT-PAY-{payment.id}",
                 amount=amount,

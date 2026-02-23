@@ -77,12 +77,16 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     checkoutBtn.addEventListener('click', function() {
-        fetch('/api/checkout_simple', {
+        if (cart.length === 0) {
+            alert('Cart is empty!');
+            return;
+        }
+        fetch('/api/sales', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({cart: cart})
+            body: JSON.stringify({items: cart})
         })
         .then(response => response.json())
         .then(data => {
@@ -124,19 +128,48 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateCartDisplay() {
         cartItems.innerHTML = '';
         let total = 0;
-        cart.forEach(item => {
+        cart.forEach((item, index) => {
             const row = document.createElement('tr');
             const itemTotal = item.price * item.quantity;
             total += itemTotal;
             row.innerHTML = `
                 <td>${item.name}</td>
-                <td>${item.quantity}</td>
-                <td>KSh ${item.price.toFixed(2)}</td>
+                <td>
+                    <input type="number" class="form-control form-control-sm qty-input"
+                           value="${item.quantity}" min="1" onchange="updateQuantity(${index}, this.value)">
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm price-input"
+                           value="${item.price.toFixed(2)}" step="0.01" min="${item.base_price}"
+                           onchange="updatePrice(${index}, this.value)">
+                </td>
                 <td>KSh ${itemTotal.toFixed(2)}</td>
             `;
             cartItems.appendChild(row);
         });
         totalEl.textContent = `KSh ${total.toFixed(2)}`;
+    }
+
+    window.updateQuantity = function(index, newQty) {
+        const qty = parseInt(newQty);
+        if (isNaN(qty) || qty <= 0) {
+            alert('Invalid quantity');
+            updateCartDisplay();
+            return;
+        }
+        cart[index].quantity = qty;
+        updateCartDisplay();
+    }
+
+    window.updatePrice = function(index, newPrice) {
+        const price = parseFloat(newPrice);
+        if (isNaN(price) || price < cart[index].base_price) {
+            alert(`Price cannot be below KES ${cart[index].base_price.toFixed(2)}`);
+            updateCartDisplay();
+            return;
+        }
+        cart[index].price = price;
+        updateCartDisplay();
     }
 });
 </script>
