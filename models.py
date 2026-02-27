@@ -144,14 +144,6 @@ class SaleItem(db.Model):
             raise ValueError(f"Not enough stock for {self.product.name}. Only {self.product.current_stock} available.")
         return quantity
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if self.product and self.quantity:
-            success, message = self.product.check_stock(self.quantity)
-            if not success:
-                raise ValueError(message)
-            self.product.update_stock(-self.quantity)
-
 class InventoryMovement(db.Model):
     __tablename__ = 'inventory_movements'
     id = db.Column(db.Integer, primary_key=True)
