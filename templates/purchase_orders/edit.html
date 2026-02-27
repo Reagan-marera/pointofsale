@@ -32,7 +32,7 @@
                             {% endfor %}
                         </select>
                     </td>
-                    <td><input type="number" step="any" class="form-control quantity" name="quantity_{{ loop.index0 }}" value="{{ po_item.quantity }}" min="0.001" required></td>
+                    <td><input type="number" step="any" class="form-control quantity" name="quantity_{{ loop.index0 }}" value="{{ po_item.quantity }}" min="0" required></td>
                     <td><input type="number" class="form-control unit-price" name="unit_price_{{ loop.index0 }}" value="{{ po_item.unit_price }}" step="0.01" min="0" required></td>
                     <td><input type="text" class="form-control total-price" name="total_price_{{ loop.index0 }}" value="{{ po_item.total_price }}" readonly></td>
                     <td><button type="button" class="btn btn-danger btn-sm remove-item-btn">Remove</button></td>
@@ -73,7 +73,7 @@
                         {% endfor %}
                     </select>
                 </td>
-                <td><input type="number" step="any" class="form-control quantity" name="quantity_${itemIndex}" min="0.001" required></td>
+                <td><input type="number" step="any" class="form-control quantity" name="quantity_${itemIndex}" min="0" required></td>
                 <td><input type="number" class="form-control unit-price" name="unit_price_${itemIndex}" step="0.01" min="0" required></td>
                 <td><input type="text" class="form-control total-price" name="total_price_${itemIndex}" readonly></td>
                 <td><button type="button" class="btn btn-danger btn-sm remove-item-btn">Remove</button></td>

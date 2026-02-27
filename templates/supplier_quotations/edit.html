@@ -30,7 +30,7 @@
             </div>
             <div class="col-md-3">
                 <label for="quantity_{{ loop.index0 }}" class="form-label">Quantity</label>
-                <input type="number" step="any" class="form-control" id="quantity_{{ loop.index0 }}" name="quantity_{{ loop.index0 }}" min="0.001" value="{{ item.quantity }}" required>
+                <input type="number" step="any" class="form-control" id="quantity_{{ loop.index0 }}" name="quantity_{{ loop.index0 }}" min="0" value="{{ item.quantity }}" required>
             </div>
             <div class="col-md-3">
                 <label for="unit_price_{{ loop.index0 }}" class="form-label">Unit Price</label>
@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="col-md-3">
                 <label for="quantity_${itemIndex}" class="form-label">Quantity</label>
-                <input type="number" step="any" class="form-control" id="quantity_${itemIndex}" name="quantity_${itemIndex}" min="0.001" value="1" required>
+                <input type="number" step="any" class="form-control" id="quantity_${itemIndex}" name="quantity_${itemIndex}" min="0" value="1" required>
             </div>
             <div class="col-md-3">
                 <label for="unit_price_${itemIndex}" class="form-label">Unit Price</label>

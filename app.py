@@ -1059,16 +1059,6 @@ def create_sale():
                 )
                 db.session.add(sale_item)
 
-                product.current_stock -= item['quantity']
-
-                movement = InventoryMovement(
-                    product_id=product.id,
-                    movement_type='sale',
-                    quantity=-item['quantity'],
-                    reference_id=sale.id
-                )
-                db.session.add(movement)
-
         db.session.commit()
         app.logger.info("Committed sale items and inventory movements to database")
 
@@ -1094,22 +1084,11 @@ def print_receipt(receipt_number):
 def delete_sale(sale_id):
     sale = Sale.query.get_or_404(sale_id)
 
-    # Reverse the stock for each item in the sale
-    for item in sale.items:
-        product = item.product
-        product.current_stock += item.quantity
+    # Delete items individually to trigger after_delete listeners for stock reversal
+    for item in list(sale.items):
+        db.session.delete(item)
 
-        # Create a reversal inventory movement
-        movement = InventoryMovement(
-            product_id=product.id,
-            movement_type='sale_reversal',
-            quantity=item.quantity,  # Positive quantity
-            reference_id=sale.id,
-            notes=f"Reversal for deleted sale #{sale.receipt_number}"
-        )
-        db.session.add(movement)
-
-    # Delete the sale. Items and movements will be handled by cascades/relationships.
+    # Delete the sale
     db.session.delete(sale)
     db.session.commit()
 
@@ -2532,7 +2511,7 @@ def create_sale_with_payment():
         db.session.add(sale)
         db.session.commit()
         
-        # Add sale items and update inventory
+        # Add sale items
         for item in items:
             product = Product.query.get(item['id'])
             if product:
@@ -2544,16 +2523,6 @@ def create_sale_with_payment():
                     total_price=item['price'] * item['quantity']
                 )
                 db.session.add(sale_item)
-                
-                product.current_stock -= item['quantity']
-                
-                movement = InventoryMovement(
-                    product_id=product.id,
-                    movement_type='sale',
-                    quantity=-item['quantity'],
-                    reference_id=sale.id
-                )
-                db.session.add(movement)
         
         db.session.commit()
         
@@ -2667,7 +2636,7 @@ def api_add_debt():
             unit_price = float(item.get('price', product.selling_price))
             item_total = unit_price * item['quantity']
 
-            # Create SaleItem
+            # Create SaleItem (triggers stock deduction)
             sale_item = SaleItem(
                 sale_id=sale.id,
                 product_id=product.id,
@@ -2685,17 +2654,6 @@ def api_add_debt():
                 total_price=item_total
             )
             db.session.add(debt_item)
-
-            # Update stock
-            product.current_stock -= item['quantity']
-            movement = InventoryMovement(
-                product_id=product.id,
-                movement_type='debt_issue',
-                quantity=-item['quantity'],
-                reference_id=debt.id,
-                notes=f"Debt issued to {debtor.name}"
-            )
-            db.session.add(movement)
 
         debtor.total_debt += total_amount
 

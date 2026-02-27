@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import event
 
 db = SQLAlchemy()
 
@@ -156,7 +157,7 @@ class InventoryMovement(db.Model):
     unit_price = db.Column(db.Float, nullable=True)
     total_amount = db.Column(db.Float, nullable=True)
 
-    product = db.relationship('Product', backref='movements')
+    product = db.relationship('Product', backref=db.backref('movements', cascade='all, delete-orphan'))
 
 class AccountingEntry(db.Model):
     __tablename__ = 'accounting_entries'
@@ -405,3 +406,65 @@ class DebtPayment(db.Model):
     payment_date = db.Column(db.DateTime, default=datetime.utcnow)
     payment_method = db.Column(db.String(50)) # cash, mpesa, bank
     reference = db.Column(db.String(100))
+
+# --- Event Listeners for Stock Management ---
+
+@event.listens_for(SaleItem, 'after_insert')
+def deduct_stock_after_sale_item_insert(mapper, connection, target):
+    product_table = Product.__table__
+    movement_table = InventoryMovement.__table__
+
+    # Deduct stock
+    connection.execute(
+        product_table.update().
+        where(product_table.c.id == target.product_id).
+        values(current_stock=product_table.c.current_stock - target.quantity)
+    )
+
+    # Create inventory movement
+    connection.execute(
+        movement_table.insert().values(
+            product_id=target.product_id,
+            movement_type='sale',
+            quantity=-target.quantity,
+            reference_id=target.sale_id,
+            movement_date=datetime.utcnow()
+        )
+    )
+
+@event.listens_for(SaleItem, 'after_delete')
+def reverse_stock_after_sale_item_delete(mapper, connection, target):
+    product_table = Product.__table__
+    movement_table = InventoryMovement.__table__
+
+    # Reverse stock
+    connection.execute(
+        product_table.update().
+        where(product_table.c.id == target.product_id).
+        values(current_stock=product_table.c.current_stock + target.quantity)
+    )
+
+    # Create inventory movement (reversal)
+    connection.execute(
+        movement_table.insert().values(
+            product_id=target.product_id,
+            movement_type='sale_reversal',
+            quantity=target.quantity,
+            reference_id=target.sale_id,
+            movement_date=datetime.utcnow(),
+            notes="Reversal for deleted sale item"
+        )
+    )
+
+@event.listens_for(DebtItem, 'after_insert')
+def deduct_stock_after_debt_item_insert(mapper, connection, target):
+    # Note: DebtItems are often created alongside SaleItems if linked to a sale.
+    # To avoid double deduction, we only deduct if NOT linked to a sale,
+    # OR we rely on SaleItem to handle it.
+    # Looking at app.py, api_add_debt creates both SaleItem and DebtItem.
+    # So if we have listeners on both, we get double deduction.
+    # However, DebtItem has a foreign key to Debt, which has a sale_id.
+
+    # Actually, it's better to have SaleItem be the source of truth for all "sales" (cash or credit).
+    # Since credit sales ALSO create SaleItems, SaleItem's listener will handle it.
+    pass

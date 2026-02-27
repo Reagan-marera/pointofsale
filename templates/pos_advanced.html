@@ -208,17 +208,11 @@ function initBarcodeScanner() {
             readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader"],
             multiple: false
         },
-        locate: true,
-        debug: {
-            drawBoundingBox: true,
-            showFrequency: true,
-            drawScanline: true,
-            showPattern: true
-        }
+        locate: true
     }, function(err) {
         if (err) {
             console.error("Scanner initialization error:", err);
-            alert("Failed to initialize barcode scanner. Please use manual entry.");
+            alert("Failed to initialize barcode scanner. Please ensure camera permissions are granted.");
             return;
         }
         console.log("Scanner initialized successfully");
@@ -229,45 +223,15 @@ function initBarcodeScanner() {
         const code = result.codeResult.code;
         console.log("Barcode detected:", code);
 
-        // Prevent duplicate scans of the same code
-        if (code === lastScannedCode) {
-            return;
-        }
-
+        if (code === lastScannedCode) return;
         lastScannedCode = code;
+
         addToCartByBarcode(code);
 
-        // Add slight delay before closing to give user feedback
         scanTimeout = setTimeout(() => {
             stopScanner();
             barcodeScannerModal.hide();
         }, 500);
-    });
-
-    Quagga.onProcessed(function(result) {
-        const drawingCtx = Quagga.canvas.ctx.overlay;
-        const drawingCanvas = Quagga.canvas.dom.overlay;
-
-        if (result) {
-            if (result.boxes) {
-                drawingCtx.clearRect(0, 0,
-                    parseInt(drawingCanvas.getAttribute("width")),
-                    parseInt(drawingCanvas.getAttribute("height")));
-                result.boxes.filter(function(box) {
-                    return box !== result.box;
-                }).forEach(function(box) {
-                    Quagga.ImageDebug.drawPath(box, {x: 0, y: 1}, drawingCtx, {color: "green", lineWidth: 2});
-                });
-            }
-
-            if (result.box) {
-                Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, drawingCtx, {color: "#00F", lineWidth: 2});
-            }
-
-            if (result.codeResult && result.codeResult.code) {
-                Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, drawingCtx, {color: 'red', lineWidth: 3});
-            }
-        }
     });
 }
 

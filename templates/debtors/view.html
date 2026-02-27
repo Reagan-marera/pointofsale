@@ -295,7 +295,7 @@ function renderCart() {
             <div>
                 <div class="fw-bold small">${item.name}</div>
                 <div class="input-group input-group-sm mt-1">
-                    <input type="number" step="any" min="0.001" class="form-control"
+                    <input type="number" step="any" min="0" class="form-control"
                            value="${item.quantity}" onchange="updateDebtItemQuantity(${item.id}, this.value)">
                     <span class="input-group-text">x ${item.price}</span>
                 </div>
