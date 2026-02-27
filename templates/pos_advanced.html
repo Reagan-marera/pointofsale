@@ -135,6 +135,15 @@ function searchProduct() {
     .then(products => {
         const resultsDiv = document.getElementById('searchResults');
         if (products.length > 0) {
+            // If it's an exact barcode match, add it immediately
+            const exactMatch = products.find(p => p.barcode === query);
+            if (exactMatch) {
+                addToCart(exactMatch.id, exactMatch.name, exactMatch.price);
+                document.getElementById('productSearch').value = '';
+                resultsDiv.innerHTML = '';
+                return;
+            }
+
             let html = '<div class="list-group">';
             products.forEach(product => {
                 html += `
@@ -200,8 +209,9 @@ function updateCartDisplay() {
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary" type="button" 
                                 onclick="updateQuantity(${index}, -1)">-</button>
-                        <input type="text" class="form-control text-center" 
-                               value="${item.quantity}" readonly style="width: 50px;">
+                        <input type="number" class="form-control text-center"
+                               value="${item.quantity}" step="any" min="0" style="width: 70px;"
+                               onchange="setQuantity(${index}, this.value)">
                         <button class="btn btn-outline-secondary" type="button" 
                                 onclick="updateQuantity(${index}, 1)">+</button>
                     </div>
@@ -239,6 +249,16 @@ function updateQuantity(index, change) {
     cart[index].quantity += change;
     if (cart[index].quantity <= 0) {
         cart.splice(index, 1);
+    }
+    updateCartDisplay();
+}
+
+function setQuantity(index, value) {
+    const qty = parseFloat(value);
+    if (isNaN(qty) || qty <= 0) {
+        cart.splice(index, 1);
+    } else {
+        cart[index].quantity = qty;
     }
     updateCartDisplay();
 }

@@ -75,11 +75,11 @@
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label for="stock" class="form-label">Initial Stock</label>
-                    <input type="number" class="form-control" id="stock" name="stock" value="{{ product.current_stock }}" min="0" required>
+                    <input type="number" step="any" class="form-control" id="stock" name="stock" value="{{ product.current_stock }}" min="0" required>
                 </div>
                 <div class="col-md-6">
                     <label for="min_stock" class="form-label">Min Stock Level</label>
-                    <input type="number" class="form-control" id="min_stock" name="min_stock" value="{{ product.min_stock_level }}" min="0" required>
+                    <input type="number" step="any" class="form-control" id="min_stock" name="min_stock" value="{{ product.min_stock_level }}" min="0" required>
                 </div>
             </div>
 

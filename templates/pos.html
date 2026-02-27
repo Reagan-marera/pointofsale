@@ -259,6 +259,14 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 console.log('Search results:', data); // Debug log
                 if (data && data.length > 0) {
+                    // Check for exact barcode match
+                    const exactMatch = data.find(p => p.barcode === searchTerm);
+                    if (exactMatch) {
+                        addToCart(exactMatch.barcode);
+                        productSearch.value = '';
+                        productList.style.display = 'none';
+                        return;
+                    }
                     displayProductResults(data);
                 } else {
                     productList.innerHTML = '<div class="list-group-item">No products found</div>';
@@ -373,8 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>
                     <input type="number"
                            class="form-control form-control-sm qty-input"
-                           step="1"
-                           min="1"
+                           step="any"
+                           min="0"
                            max="${item.stock}"
                            value="${item.quantity}"
                            data-index="${index}">
@@ -440,7 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateQuantity(index, newQuantity) {
-        const quantity = parseInt(newQuantity);
+        const quantity = parseFloat(newQuantity);
         const item = cart[index];
 
         if (isNaN(quantity) || quantity <= 0) {

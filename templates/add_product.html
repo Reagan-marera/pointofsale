@@ -69,7 +69,7 @@
                         <div class="col-md-6 mb-3">
                             <label for="barcode" class="form-label">Barcode *</label>
                             <div class="input-group">
-                                <input type="text" class="form-control" id="barcode" name="barcode" required>
+                                <input type="text" class="form-control" id="barcode" name="barcode" required autofocus>
                                 <button class="btn btn-outline-primary" type="button" id="scan-barcode-btn" data-bs-toggle="modal" data-bs-target="#barcodeScannerModal">
                                     <i class="bi bi-upc-scan"></i> Scan
                                 </button>
@@ -110,12 +110,12 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="stock" class="form-label">Initial Stock *</label>
-                            <input type="number" class="form-control" id="stock" name="stock" value="0" min="0" required>
+                            <input type="number" step="any" class="form-control" id="stock" name="stock" value="0" min="0" required>
                         </div>
 
                         <div class="col-md-6 mb-3">
                             <label for="min_stock" class="form-label">Minimum Stock Level *</label>
-                            <input type="number" class="form-control" id="min_stock" name="min_stock" value="5" min="0" required>
+                            <input type="number" step="any" class="form-control" id="min_stock" name="min_stock" value="5" min="0" required>
                         </div>
                     </div>
                 </div>
@@ -198,6 +198,16 @@ document.addEventListener('DOMContentLoaded', function() {
         sortField: {
             field: "text",
             direction: "asc"
+        }
+    });
+
+    // Prevent form submission on Enter in barcode field
+    document.getElementById('barcode').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const nextSelect = document.getElementById('name').nextElementSibling.querySelector('input');
+            if (nextSelect) nextSelect.focus();
+            else document.getElementById('name').focus();
         }
     });
 

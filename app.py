@@ -342,8 +342,8 @@ def edit_product(product_id):
         product.category = request.form['category']
         product.buying_price = float(request.form['buying_price'])
         product.selling_price = float(request.form['selling_price'])
-        product.current_stock = int(request.form['stock'])
-        product.min_stock_level = int(request.form['min_stock'])
+        product.current_stock = float(request.form['stock'])
+        product.min_stock_level = float(request.form['min_stock'])
         
         # Get the submitted barcode
         submitted_barcode = request.form['barcode'].strip()
@@ -804,8 +804,8 @@ def add_product():
         category = request.form['category']
         buying_price = float(request.form['buying_price'])
         selling_price = float(request.form['selling_price'])
-        stock = int(request.form['stock'])
-        min_stock_level = int(request.form['min_stock'])
+        stock = float(request.form['stock'])
+        min_stock_level = float(request.form['min_stock'])
         barcode = request.form['barcode'].strip()
         supplier_id = request.form['supplier_id']
         dealer_id = request.form['dealer_id']  # Get dealer_id from form
@@ -891,8 +891,8 @@ def upload_products_excel():
                     category = str(row['Category']).strip()
                     buying_price = float(row['Buying Price'])
                     selling_price = float(row['Selling Price'])
-                    stock = int(row['Stock'])
-                    min_stock = int(row['Min Stock'])
+                    stock = float(row['Stock'])
+                    min_stock = float(row['Min Stock'])
                     supplier_name = str(row['Supplier']).strip()
                     dealer_name = str(row['Dealer']).strip()
                     vatable = str(row['Vatable']).strip().lower() in ['yes', 'true', '1', 'y']
@@ -1149,7 +1149,7 @@ def edit_purchase_order(order_id):
         i = 0
         while f'product_{i}' in request.form:
             item_id = request.form.get(f'product_{i}')
-            quantity = int(request.form.get(f'quantity_{i}', 0))
+            quantity = float(request.form.get(f'quantity_{i}', 0))
             unit_price = float(request.form.get(f'unit_price_{i}', 0))
             if item_id and quantity > 0:
                 item = Item.query.get(item_id)
@@ -1195,7 +1195,7 @@ def add_purchase_order():
         i = 0
         while f'product_{i}' in request.form:
             item_id = request.form.get(f'product_{i}')
-            quantity = int(request.form.get(f'quantity_{i}', 0))
+            quantity = float(request.form.get(f'quantity_{i}', 0))
             unit_price = float(request.form.get(f'unit_price_{i}', 0))
             if item_id and quantity > 0:
                 item = Item.query.get(item_id)
@@ -1314,7 +1314,7 @@ def edit_supplier_quotation(quotation_id):
             if key.startswith('product_'):
                 index = key.split('_')[1]
                 item_id = value
-                quantity = int(request.form[f'quantity_{index}'])
+                quantity = float(request.form[f'quantity_{index}'])
                 unit_price = float(request.form[f'unit_price_{index}'])
                 total_price = quantity * unit_price
                 total_amount += total_price
@@ -2126,47 +2126,6 @@ def request_new_otp():
     mail.send(msg)
 
     return jsonify({"message": "New OTP sent to your email"}), 200
-# Simplified POS routes
-@app.route('/pos_simple')
-@login_required(roles=['cashier', 'manager', 'admin'])
-def pos_simple():
-    return render_template('pos_simple.html')
-
-@app.route('/api/add_to_cart', methods=['POST'])
-@login_required(roles=['cashier', 'manager', 'admin'])
-def add_to_cart_simple():
-    data = request.get_json()
-    barcode = data.get('barcode')
-
-    product = Product.query.filter_by(barcode=barcode).first()
-
-    if not product:
-        return jsonify({'success': False, 'error': 'Product not found'})
-
-    if product.current_stock < 1:
-        return jsonify({'success': False, 'error': 'Product out of stock'})
-
-    cart = session.get('cart', [])
-
-    existing_item = next((item for item in cart if item['id'] == product.id), None)
-
-    if existing_item:
-        if existing_item['quantity'] >= product.current_stock:
-            return jsonify({'success': False, 'error': 'Not enough stock'})
-        existing_item['quantity'] += 1
-    else:
-        cart.append({
-            'id': product.id,
-            'name': product.name,
-            'price': product.selling_price,
-            'base_price': product.selling_price,
-            'quantity': 1
-        })
-
-    session['cart'] = cart
-
-    return jsonify({'success': True, 'cart': cart})
-
 @app.route('/supplier_quotations')
 @login_required(roles=['manager', 'admin'])
 def supplier_quotations():
@@ -2189,7 +2148,7 @@ def add_supplier_quotation():
             if key.startswith('product_'):
                 index = key.split('_')[1]
                 item_id = value
-                quantity = int(request.form[f'quantity_{index}'])
+                quantity = float(request.form[f'quantity_{index}'])
                 unit_price = float(request.form[f'unit_price_{index}'])
                 total_price = quantity * unit_price
                 total_amount += total_price
