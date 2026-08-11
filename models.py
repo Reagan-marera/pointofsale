@@ -49,6 +49,11 @@ class Product(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # KRA eTIMS Fields
+    etims_item_code = db.Column(db.String(50), nullable=True)
+    etims_item_cls_code = db.Column(db.String(50), default='5059690800')
+    etims_tax_type = db.Column(db.String(5), default='B')
+
     supplier = db.relationship('Supplier', backref=db.backref('supplier_products', lazy=True))
     dealer = db.relationship('Dealer', backref='products')
 
@@ -89,9 +94,31 @@ class Sale(db.Model):
     split_payment = db.Column(db.Boolean, default=False)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
 
+    # KRA eTIMS Fields
+    etims_invc_no = db.Column(db.Integer, nullable=True)
+    etims_rcpt_no = db.Column(db.Integer, nullable=True)
+    etims_intrl_data = db.Column(db.String(100), nullable=True)
+    etims_rcpt_sign = db.Column(db.String(100), nullable=True)
+    etims_status = db.Column(db.String(20), default='PENDING')
+    etims_error = db.Column(db.Text, nullable=True)
+
     items = db.relationship('SaleItem', backref='sale', cascade='all, delete-orphan')
     location = db.relationship('Location', backref='sales')
     user = db.relationship('User', backref='sales')
+
+    @property
+    def etims_qr_url(self):
+        if not self.etims_rcpt_sign:
+            return ""
+        config = ETIMSConfig.query.first()
+        if not config:
+            return ""
+        host = "etims-sbx.kra.go.ke" if config.etims_is_sandbox else "etims.kra.go.ke"
+        pin = config.etims_tin or "P000000045R"
+        bhf_id = config.etims_bhf_id or "00"
+        from urllib.parse import quote
+        data = f"{pin}{bhf_id}{self.etims_rcpt_sign}"
+        return f"https://{host}/common/link/etims/receipt/indexEtimsReceiptData?Data={quote(data)}"
 
     @classmethod
     def generate_receipt_number(cls):
@@ -264,3 +291,19 @@ class OTP(db.Model):
 
     def __repr__(self):
         return f'<OTP {self.email}>'
+
+class ETIMSConfig(db.Model):
+    __tablename__ = 'etims_configs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    etims_enabled = db.Column(db.Boolean, default=False)
+    etims_url = db.Column(db.String(200), default='https://etims-api-sbx.kra.go.ke/etims-api')
+    etims_tin = db.Column(db.String(20), default='')
+    etims_bhf_id = db.Column(db.String(10), default='00')
+    etims_dvc_srl_no = db.Column(db.String(50), default='')
+    etims_cmc_key = db.Column(db.String(256), default='')
+    etims_is_sandbox = db.Column(db.Boolean, default=True)
+    next_invc_no = db.Column(db.Integer, default=1)
+
+    def __repr__(self):
+        return f'<ETIMSConfig enabled={self.etims_enabled}>'

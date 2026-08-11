@@ -96,6 +96,13 @@
                             </a>
                         </li>
                         {% endif %}
+                        {% if session.role in ['admin', 'manager'] %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'etims_settings' %}active{% endif %}" href="{{ url_for('etims_settings') }}">
+                                <i class="fas fa-file-invoice-dollar"></i> KRA eTIMS
+                            </a>
+                        </li>
+                        {% endif %}
                         {% if session.role == 'admin' %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}" href="{{ url_for('manage_users') }}">

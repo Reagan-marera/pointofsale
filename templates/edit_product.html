@@ -88,6 +88,22 @@
                 </label>
             </div>
 
+            <div class="mb-3">
+                <label for="etims_item_cls_code" class="form-label">eTIMS Classification Code</label>
+                <input type="text" class="form-control" id="etims_item_cls_code" name="etims_item_cls_code" value="{{ product.etims_item_cls_code or '5059690800' }}" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="etims_tax_type" class="form-label">eTIMS Tax Type</label>
+                <select class="form-select" id="etims_tax_type" name="etims_tax_type" required>
+                    <option value="B" {% if product.etims_tax_type == 'B' or not product.etims_tax_type %}selected{% endif %}>Standard VAT (16%) [B]</option>
+                    <option value="A" {% if product.etims_tax_type == 'A' %}selected{% endif %}>Exempt (0%) [A]</option>
+                    <option value="C" {% if product.etims_tax_type == 'C' %}selected{% endif %}>Zero Rated (0%) [C]</option>
+                    <option value="D" {% if product.etims_tax_type == 'D' %}selected{% endif %}>Non-VAT (0%) [D]</option>
+                    <option value="E" {% if product.etims_tax_type == 'E' %}selected{% endif %}>Reduced Rate (8%) [E]</option>
+                </select>
+            </div>
+
             <button type="submit" class="btn btn-primary">Save Changes</button>
         </form>
     </div>

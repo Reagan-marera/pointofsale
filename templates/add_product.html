@@ -83,6 +83,26 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="etims_item_cls_code" class="form-label">eTIMS Classification Code *</label>
+                            <input type="text" class="form-control" id="etims_item_cls_code" name="etims_item_cls_code" value="5059690800" placeholder="e.g. 5059690800" required>
+                            <small class="text-muted">UNSPSC-derived code from KRA eTIMS</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="etims_tax_type" class="form-label">eTIMS Tax Type *</label>
+                            <select class="form-select" id="etims_tax_type" name="etims_tax_type" required>
+                                <option value="B" selected>Standard VAT (16%) [B]</option>
+                                <option value="A">Exempt (0%) [A]</option>
+                                <option value="C">Zero Rated (0%) [C]</option>
+                                <option value="D">Non-VAT (0%) [D]</option>
+                                <option value="E">Reduced Rate (8%) [E]</option>
+                            </select>
+                            <small class="text-muted">KRA designated tax category</small>
+                        </div>
+                    </div>
                 </div>
             </div>
 
