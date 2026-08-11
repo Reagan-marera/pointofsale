@@ -1,0 +1,43 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Add Financier Credit{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="h2 mb-4">Add New Financier Credit</h1>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_financier_credit') }}">
+                <div class="mb-3">
+                    <label for="financier_id" class="form-label">Financier</label>
+                    <select class="form-select" id="financier_id" name="financier_id" required>
+                        <option value="" selected disabled>Select a financier</option>
+                        {% for financier in financiers %}
+                        <option value="{{ financier.id }}">{{ financier.financier_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="amount_credited" class="form-label">Amount Credited</label>
+                    <div class="input-group">
+                        <span class="input-group-text">KSh</span>
+                        <input type="number" step="0.01" class="form-control" id="amount_credited" name="amount_credited" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="transaction_ref" class="form-label">Transaction Reference</label>
+                    <input type="text" class="form-control" id="transaction_ref" name="transaction_ref" required>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <a href="{{ url_for('list_financier_credits') }}" class="btn btn-secondary me-2">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Add Credit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Print Receipt</title>
+    <style>
+        body {
+            font-family: monospace;
+            width: 300px;
+        }
+        .container {
+            width: 100%;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 5px;
+            text-align: left;
+        }
+        .text-end {
+            text-align: right;
+        }
+        hr {
+            border: 1px dashed #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Receipt</h1>
+        <hr>
+        <p>Receipt #: {{ sale.receipt_number }}</p>
+        <p>Date: {{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</p>
+        <p>Cashier: {{ sale.user.username }}</p>
+        <p>Customer: {{ sale.customer.name if sale.customer else 'Walk-in' }}</p>
+        <hr>
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th class="text-end">Price</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in sale.items %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td class="text-end">KSh {{ "%.2f"|format(item.unit_price) }}</td>
+                    <td class="text-end">KSh {{ "%.2f"|format(item.total_price) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <hr>
+        <table>
+            <tbody>
+                <tr>
+                    <td>Subtotal:</td>
+                    <td class="text-end">KSh {{ "%.2f"|format(sale.subtotal) }}</td>
+                </tr>
+                <tr>
+                    <td>Tax:</td>
+                    <td class="text-end">KSh {{ "%.2f"|format(sale.tax_amount) }}</td>
+                </tr>
+                <tr>
+                    <td>Total:</td>
+                    <td class="text-end">KSh {{ "%.2f"|format(sale.total_amount) }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <hr>
+        <p>Payment Method: {{ sale.payment_method|capitalize }}</p>
+        <hr>
+        <p style="text-align: center;">Thank you for your purchase!</p>
+    </div>
+</body>
+</html>

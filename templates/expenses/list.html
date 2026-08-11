@@ -1,0 +1,50 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Expenses</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_expense') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-circle"></i> Add Expense
+        </a>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-sm">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Payee Name</th>
+                <th>Transaction Details</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for expense in expenses %}
+            <tr>
+                <td>{{ expense.date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ expense.payee_name }}</td>
+                <td>{{ expense.transaction_details }}</td>
+                <td>{{ expense.description }}</td>
+                <td>KSh {{ "%.2f"|format(expense.amount) }}</td>
+                <td>
+                    <a href="{{ url_for('edit_expense', expense_id=expense.id) }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form action="{{ url_for('delete_expense', expense_id=expense.id) }}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

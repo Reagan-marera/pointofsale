@@ -1,0 +1,113 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Supplier Reports{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Supplier Reports</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5>Filter Reports</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('supplier_report') }}">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="supplier_id" class="form-label">Supplier</label>
+                    <select class="form-select" id="supplier_id" name="supplier_id">
+                        <option value="">All Suppliers</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}" {% if request.args.get('supplier_id') == supplier.id|string %}selected{% endif %}>{{ supplier.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Supplier Performance</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Items Sold</th>
+                                <th>Total Sales</th>
+                                <th>Total Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in products %}
+                            <tr>
+                                <td>{{ product.name }}</td>
+                                <td>{{ product.items_sold }}</td>
+                                <td>KSh {{ "%.2f"|format(product.total_sales) }}</td>
+                                <td>KSh {{ "%.2f"|format(product.total_profit) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Sales by Product</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="salesChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    var ctx = document.getElementById('salesChart').getContext('2d');
+    var myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [{% for product in products %}'{{ product.name }}',{% endfor %}],
+            datasets: [{
+                label: 'Total Sales',
+                data: [{% for product in products %}{{ product.total_sales }},{% endfor %}],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Total Profit',
+                data: [{% for product in products %}{{ product.total_profit }},{% endfor %}],
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+
+{% endblock %}

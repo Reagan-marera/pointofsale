@@ -1,0 +1,513 @@
+{% extends "layouts/base.html" %}
+{% block title %}POS Terminal{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">POS Terminal</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button class="btn btn-sm btn-outline-secondary me-2" id="new-sale-btn">
+            <i class="fas fa-plus-circle"></i> New Sale
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="print-receipt-btn">
+            <i class="fas fa-print"></i> Print Receipt
+        </button>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Products</h5>
+            </div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="barcode-input" placeholder="Enter barcode..." autofocus>
+                    <button class="btn btn-primary" type="button" id="scan-btn">
+                        <i class="fas fa-barcode"></i> Scan
+                    </button>
+                </div>
+                <div class="mb-3 position-relative">
+                    <label for="product-search" class="form-label">Or search for a product</label>
+                    <input type="text" class="form-control" id="product-search" placeholder="Search by name or barcode...">
+                    <div id="product-list" class="list-group mt-2" style="display: none;"></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm" id="cart-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Price</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cart-items">
+                            <!-- Cart items will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Payment</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <td>Subtotal:</td>
+                                <td class="text-end" id="subtotal">KSh 0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Tax (16%):</td>
+                                <td class="text-end" id="tax">KSh 0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Total:</td>
+                                <td class="text-end fw-bold" id="total">KSh 0.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Payment Method</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="payment-method" id="cash" value="cash" checked>
+                        <label class="btn btn-outline-primary" for="cash">Cash</label>
+                        <input type="radio" class="btn-check" name="payment-method" id="mpesa" value="mpesa">
+                        <label class="btn btn-outline-primary" for="mpesa">M-Pesa</label>
+                    </div>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="split-payment">
+                    <label class="form-check-label" for="split-payment">
+                        Split Payment
+                    </label>
+                </div>
+                <button class="btn btn-success w-100 py-3" id="checkout-btn">
+                    <i class="fas fa-credit-card"></i> Complete Sale
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Barcode Scanner Modal -->
+<div class="modal fade" id="barcodeScannerModal" tabindex="-1" aria-labelledby="barcodeScannerModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="barcodeScannerModalLabel">Scan Barcode</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="interactive" class="viewport"></div>
+        <div class="form-group mt-3">
+            <label for="manual-barcode-input">Manual Barcode Entry</label>
+            <input type="text" class="form-control" id="manual-barcode-input" placeholder="Enter barcode manually">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="manual-scan-confirm-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM Elements
+    const barcodeInput = document.getElementById('barcode-input');
+    const scanBtn = document.getElementById('scan-btn');
+    const cartItems = document.getElementById('cart-items');
+    const subtotalEl = document.getElementById('subtotal');
+    const taxEl = document.getElementById('tax');
+    const totalEl = document.getElementById('total');
+    const checkoutBtn = document.getElementById('checkout-btn');
+    const productSearch = document.getElementById('product-search');
+    const productList = document.getElementById('product-list');
+    const newSaleBtn = document.getElementById('new-sale-btn');
+    const printReceiptBtn = document.getElementById('print-receipt-btn');
+
+    // Cart state
+    let cart = [];
+    let searchTimeout = null;
+    let lastReceiptNumber = null;
+
+    // Event Listeners
+    scanBtn.addEventListener('click', function() {
+        const barcode = barcodeInput.value.trim();
+        if (barcode) {
+            addToCart(barcode);
+        }
+    });
+
+    barcodeInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const barcode = barcodeInput.value.trim();
+            if (barcode) {
+                addToCart(barcode);
+            }
+        }
+    });
+
+    // Print Receipt functionality
+    printReceiptBtn.addEventListener('click', function() {
+        if (!lastReceiptNumber) {
+            alert('No receipt available to print. Complete a sale first.');
+            return;
+        }
+        const printWindow = window.open(`/receipt/print/${lastReceiptNumber}`, '_blank');
+        if (!printWindow) {
+            alert('Popup blocked! Please allow popups to print receipts.');
+        }
+    });
+
+    // Add search functionality
+    productSearch.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        if (searchTerm.length > 0) {
+            productList.style.display = 'block';
+            productList.innerHTML = '<div class="list-group-item">Searching...</div>';
+            searchTimeout = setTimeout(() => {
+                searchProducts(searchTerm);
+            }, 300);
+        } else {
+            productList.style.display = 'none';
+        }
+    });
+
+    // Hide product list when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!productSearch.contains(e.target) && !productList.contains(e.target)) {
+            productList.style.display = 'none';
+        }
+    });
+
+    // New Sale button
+    newSaleBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to start a new sale? Current cart will be cleared.')) {
+            cart = [];
+            updateCartDisplay();
+            barcodeInput.value = '';
+            barcodeInput.focus();
+        }
+    });
+
+    // Checkout
+    checkoutBtn.addEventListener('click', function() {
+        if (cart.length === 0) {
+            alert('Your cart is empty!');
+            return;
+        }
+        const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+        const splitPayment = document.getElementById('split-payment').checked;
+        
+        // Prepare items with the current prices (including any manual edits)
+        const items = cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.currentPrice || item.price, // Use edited price if available
+            quantity: item.quantity
+        }));
+        
+        fetch('/api/sales', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                items: items,
+                payment_method: paymentMethod,
+                split_payment: splitPayment
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                lastReceiptNumber = data.receipt_number;
+                alert(`Checkout successful! Receipt #${data.receipt_number}`);
+                cart = [];
+                updateCartDisplay();
+                barcodeInput.value = '';
+                barcodeInput.focus();
+            } else {
+                alert('Checkout failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Checkout failed. Please try again.');
+        });
+    });
+
+    // Search products function
+    function searchProducts(searchTerm) {
+        fetch(`/api/products/search?q=${encodeURIComponent(searchTerm)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    displayProductResults(data);
+                } else {
+                    productList.innerHTML = '<div class="list-group-item">No products found</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                productList.innerHTML = '<div class="list-group-item">Error loading products</div>';
+            });
+    }
+
+    function displayProductResults(products) {
+        productList.innerHTML = '';
+        products.forEach(product => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">${product.name}</h6>
+                        <small class="text-muted">Barcode: ${product.barcode}</small>
+                        <small class="text-muted">KSh ${parseFloat(product.price).toFixed(2)}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary add-product-btn"
+                            data-barcode="${product.barcode}"
+                            data-name="${product.name}"
+                            data-price="${product.price}">
+                        Add
+                    </button>
+                </div>
+            `;
+            productList.appendChild(item);
+        });
+        productList.style.display = 'block';
+        document.querySelectorAll('.add-product-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const barcode = this.getAttribute('data-barcode');
+                addToCart(barcode);
+                productSearch.value = '';
+                productList.style.display = 'none';
+            });
+        });
+    }
+
+    // Add to cart function
+    function addToCart(barcode) {
+        fetch('/api/products/' + barcode)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                const existingItem = cart.find(item => item.id === data.id);
+                if (existingItem) {
+                    existingItem.quantity += 1;
+                    // Preserve manual price edit if it exists
+                    if (!existingItem.currentPrice) {
+                        existingItem.currentPrice = existingItem.price;
+                    }
+                } else {
+                    cart.push({
+                        id: data.id,
+                        name: data.name,
+                        price: data.price,
+                        currentPrice: data.price, // Track editable price
+                        quantity: 1
+                    });
+                }
+                updateCartDisplay();
+                barcodeInput.value = '';
+                barcodeInput.focus();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to add item. Please try again.');
+            });
+    }
+
+    // Update cart display with editable prices
+    function updateCartDisplay() {
+        cartItems.innerHTML = '';
+        let subtotal = 0;
+        cart.forEach((item, index) => {
+            const currentPrice = item.currentPrice !== undefined ? item.currentPrice : item.price;
+            const itemTotal = currentPrice * item.quantity;
+            subtotal += itemTotal;
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">KSh</span>
+                        <input type="number" 
+                               class="form-control form-control-sm price-input"
+                               step="0.01"
+                               min="0"
+                               value="${currentPrice.toFixed(2)}"
+                               data-index="${index}"
+                               onchange="updatePrice(${index}, this.value)">
+                    </div>
+                </td>
+                <td>
+                    <input type="number"
+                           class="form-control form-control-sm qty-input"
+                           step="1"
+                           min="1"
+                           value="${item.quantity}"
+                           data-index="${index}"
+                           onchange="updateQuantity(${index}, this.value)">
+                </td>
+                <td>KSh ${itemTotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger remove-item" data-index="${index}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            cartItems.appendChild(row);
+        });
+        
+        // Update remove buttons
+        document.querySelectorAll('.remove-item').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                removeItem(index);
+            });
+        });
+        
+        // Calculate tax and total
+        const taxRate = 0.16;
+        const tax = subtotal * taxRate;
+        const total = subtotal + tax;
+        subtotalEl.textContent = `KSh ${subtotal.toFixed(2)}`;
+        taxEl.textContent = `KSh ${tax.toFixed(2)}`;
+        totalEl.textContent = `KSh ${total.toFixed(2)}`;
+    }
+
+    // Update price function (global scope)
+    window.updatePrice = function(index, newPrice) {
+        const price = parseFloat(newPrice);
+        if (isNaN(price) || price < 0) {
+            alert('Please enter a valid price (greater than or equal to 0).');
+            updateCartDisplay();
+            return;
+        }
+        cart[index].currentPrice = price;
+        updateCartDisplay();
+    };
+
+    // Update quantity function (global scope)
+    window.updateQuantity = function(index, newQuantity) {
+        const quantity = parseInt(newQuantity);
+        if (isNaN(quantity) || quantity < 1) {
+            alert('Please enter a valid quantity (greater than 0).');
+            updateCartDisplay();
+            return;
+        }
+        cart[index].quantity = quantity;
+        updateCartDisplay();
+    };
+
+    // Remove item function
+    function removeItem(index) {
+        cart.splice(index, 1);
+        updateCartDisplay();
+    }
+
+    // Initialize
+    updateCartDisplay();
+});
+</script>
+<style>
+.viewport {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    overflow: hidden;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+}
+.viewport canvas, .viewport video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+#scanner-container {
+    position: relative;
+}
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+.scanner-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background-color: rgba(255, 0, 0, 0.5);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+    animation: scan 2s infinite linear;
+}
+@keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+}
+canvas.drawing, canvas.drawingBuffer {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+#product-list {
+    position: absolute;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+#cart-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+.qty-input {
+    width: 70px;
+    text-align: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+.price-input {
+    width: 100px;
+    text-align: right;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+.remove-item {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+.list-group-item-action:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+}
+.input-group-text {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+</style>
+{% endblock %}

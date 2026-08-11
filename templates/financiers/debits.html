@@ -1,0 +1,51 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Manage Financier Debits{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">Manage Financier Debits</h1>
+        <a href="{{ url_for('add_financier_debit') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add New Debit
+        </a>
+    </div>
+
+    {% include 'partials/_flash_messages.html' %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Financier Name</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Principal</th>
+                        <th scope="col">Interest</th>
+                        <th scope="col">Total</th>
+                        <th scope="col">Transaction Ref</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for debit in debits %}
+                    <tr>
+                        <td>{{ debit.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ debit.financier_name }}</td>
+                        <td>{{ debit.description }}</td>
+                        <td>KSh {{ "%.2f"|format(debit.principal_amount) }}</td>
+                        <td>KSh {{ "%.2f"|format(debit.interest_amount) }}</td>
+                        <td>KSh {{ "%.2f"|format(debit.total_amount) }}</td>
+                        <td>{{ debit.transaction_ref }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No debits found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

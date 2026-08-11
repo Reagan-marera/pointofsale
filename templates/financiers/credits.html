@@ -1,0 +1,47 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Manage Financier Credits{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">Manage Financier Credits</h1>
+        <a href="{{ url_for('add_financier_credit') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add New Credit
+        </a>
+    </div>
+
+    {% include 'partials/_flash_messages.html' %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Financier Name</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Amount Credited</th>
+                        <th scope="col">Transaction Ref</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for credit in credits %}
+                    <tr>
+                        <td>{{ credit.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ credit.financier_name }}</td>
+                        <td>{{ credit.description }}</td>
+                        <td>KSh {{ "%.2f"|format(credit.amount_credited) }}</td>
+                        <td>{{ credit.transaction_ref }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center">No credits found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
