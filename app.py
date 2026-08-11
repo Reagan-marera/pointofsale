@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session,logging
 from flask_mail import Mail, Message
-from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP
+from models import db,  User, Product, Sale, SaleItem, InventoryMovement, AccountingEntry,PurchaseOrder,Supplier,Expense,Dealer,PurchaseOrderItem,Financier,FinancierCredit,FinancierDebit,Location,OTP, ETIMSConfig
 from datetime import datetime,timedelta
 import random
 from sqlalchemy.orm import joinedload
@@ -22,6 +22,42 @@ mail = Mail(app)
 # Create tables before first request
 with app.app_context():
     db.create_all()
+    # Auto patch SQLite database with new columns
+    def auto_patch_db():
+        try:
+            from sqlalchemy import text
+            # Add columns to products if missing
+            cols_products = [
+                ("etims_item_code", "VARCHAR(50)"),
+                ("etims_item_cls_code", "VARCHAR(50) DEFAULT '5059690800'"),
+                ("etims_tax_type", "VARCHAR(5) DEFAULT 'B'")
+            ]
+            for col_name, col_type in cols_products:
+                try:
+                    db.session.execute(text(f"ALTER TABLE products ADD COLUMN {col_name} {col_type}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+            # Add columns to sales if missing
+            cols_sales = [
+                ("etims_invc_no", "INTEGER"),
+                ("etims_rcpt_no", "INTEGER"),
+                ("etims_intrl_data", "VARCHAR(100)"),
+                ("etims_rcpt_sign", "VARCHAR(100)"),
+                ("etims_status", "VARCHAR(20) DEFAULT 'PENDING'"),
+                ("etims_error", "TEXT")
+            ]
+            for col_name, col_type in cols_sales:
+                try:
+                    db.session.execute(text(f"ALTER TABLE sales ADD COLUMN {col_name} {col_type}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        except Exception as e:
+            app.logger.error(f"Database auto-patch error: {e}")
+
+    auto_patch_db()
 
 # Helper functions
 def generate_barcode():
@@ -338,6 +374,8 @@ def edit_product(product_id):
         product.supplier_id = request.form['supplier_id']
         product.dealer_id = request.form['dealer_id']
         product.vatable = 'vatable' in request.form
+        product.etims_item_cls_code = request.form.get('etims_item_cls_code', '5059690800')
+        product.etims_tax_type = request.form.get('etims_tax_type', 'B')
 
         if not product.name or not product.category or not product.buying_price or not product.selling_price or not product.current_stock or not product.min_stock_level or not product.barcode or not product.supplier_id or not product.dealer_id:
             flash('Please fill out all fields.', 'danger')
@@ -733,7 +771,9 @@ def add_product():
             current_stock=stock,
             supplier_id=supplier_id,
             dealer_id=dealer_id,  # Assign dealer_id to the product
-            vatable=vatable
+            vatable=vatable,
+            etims_item_cls_code=request.form.get('etims_item_cls_code', '5059690800'),
+            etims_tax_type=request.form.get('etims_tax_type', 'B')
         )
 
         db.session.add(new_product)
@@ -845,6 +885,14 @@ def create_sale():
         
         # Clear the cart session
         session.pop('cart', None)
+
+        # eTIMS Integration
+        config = get_etims_config()
+        if config.etims_enabled:
+            try:
+                transmit_sale_to_etims(sale.id, session.get('username', 'admin'))
+            except Exception as etims_err:
+                app.logger.error(f"Failed to submit sale {sale.id} to eTIMS: {etims_err}")
 
         return jsonify({'success': True, 'receipt_number': sale.receipt_number})
     except Exception as e:
@@ -1899,5 +1947,147 @@ def add_to_cart_simple_custom():
     session['cart'] = cart
 
     return jsonify({'success': True, 'cart': cart})
+
+# --- KRA eTIMS Integration Routes ---
+
+def get_etims_config():
+    config = ETIMSConfig.query.first()
+    if not config:
+        config = ETIMSConfig()
+        db.session.add(config)
+        db.session.commit()
+    return config
+
+def transmit_sale_to_etims(sale_id, cashier_username="admin"):
+    from etims_service import ETIMSService
+    sale = Sale.query.get(sale_id)
+    if not sale:
+        return False, "Sale not found"
+
+    config = get_etims_config()
+    if not config.etims_enabled:
+        return False, "KRA eTIMS integration is disabled in settings."
+
+    if not config.etims_cmc_key:
+        return False, "KRA eTIMS device is not initialized. Please configure and handshake."
+
+    # First register any unregistered products in the sale to ensure no eTIMS rejections
+    for item in sale.items:
+        product = item.product
+        if not product.etims_item_code:
+            try:
+                ETIMSService.register_product(config, product)
+            except Exception as e:
+                app.logger.error(f"Error registering product {product.id} during sale: {e}")
+
+    # Submit sale to eTIMS
+    result = ETIMSService.submit_sale(config, sale, cashier_username)
+
+    if result['success']:
+        sale.etims_invc_no = result['invc_no']
+        sale.etims_rcpt_no = result['rcpt_no']
+        sale.etims_intrl_data = result['intrl_data']
+        sale.etims_rcpt_sign = result['rcpt_sign']
+        sale.etims_status = 'SENT'
+        sale.etims_error = None
+        db.session.commit()
+        return True, result['message']
+    else:
+        sale.etims_invc_no = result.get('invc_no')
+        sale.etims_status = 'FAILED'
+        sale.etims_error = result.get('message')
+        db.session.commit()
+        return False, result['message']
+
+@app.route('/admin/etims', methods=['GET', 'POST'])
+@login_required(roles=['admin', 'manager'])
+def etims_settings():
+    config = get_etims_config()
+    if request.method == 'POST':
+        config.etims_enabled = 'etims_enabled' in request.form
+        config.etims_url = request.form['etims_url'].strip()
+        config.etims_tin = request.form['etims_tin'].strip()
+        config.etims_bhf_id = request.form['etims_bhf_id'].strip()
+        config.etims_dvc_srl_no = request.form['etims_dvc_srl_no'].strip()
+        config.etims_is_sandbox = 'etims_is_sandbox' in request.form
+
+        db.session.commit()
+        flash('eTIMS settings saved successfully!', 'success')
+        return redirect(url_for('etims_settings'))
+
+    return render_template('etims_settings.html', config=config)
+
+@app.route('/admin/etims/initialize', methods=['POST'])
+@login_required(roles=['admin', 'manager'])
+def etims_initialize():
+    from etims_service import ETIMSService
+    config = get_etims_config()
+
+    if not config.etims_tin or not config.etims_bhf_id or not config.etims_dvc_srl_no:
+        flash('Please fill out TIN, Branch ID, and Device Serial Number before initializing.', 'danger')
+        return redirect(url_for('etims_settings'))
+
+    result = ETIMSService.initialize_device(
+        config_model=config,
+        db_session=db.session,
+        tin=config.etims_tin,
+        bhf_id=config.etims_bhf_id,
+        dvc_srl_no=config.etims_dvc_srl_no,
+        url=config.etims_url,
+        is_sandbox=config.etims_is_sandbox
+    )
+
+    if result['success']:
+        flash(result['message'], 'success')
+    else:
+        flash(result['message'], 'danger')
+
+    return redirect(url_for('etims_settings'))
+
+@app.route('/admin/etims/sync_products', methods=['POST'])
+@login_required(roles=['admin', 'manager'])
+def etims_sync_products():
+    from etims_service import ETIMSService
+    config = get_etims_config()
+
+    if not config.etims_cmc_key:
+        flash('Please initialize eTIMS device handshake before synchronizing products.', 'danger')
+        return redirect(url_for('etims_settings'))
+
+    products = Product.query.all()
+    success_count = 0
+    fail_count = 0
+
+    for product in products:
+        result = ETIMSService.register_product(config, product)
+        if result['success']:
+            success_count += 1
+        else:
+            fail_count += 1
+
+    db.session.commit()
+
+    if fail_count == 0:
+        flash(f'Successfully synchronized all {success_count} products with KRA eTIMS!', 'success')
+    else:
+        flash(f'Synchronized {success_count} products. {fail_count} products failed registration.', 'warning')
+
+    return redirect(url_for('etims_settings'))
+
+@app.route('/sales/etims/retry/<int:sale_id>', methods=['POST'])
+@login_required(roles=['admin', 'manager', 'cashier'])
+def etims_retry_sale(sale_id):
+    success, message = transmit_sale_to_etims(sale_id, session.get('username', 'admin'))
+    if success:
+        flash(f"Successfully certified with eTIMS! {message}", "success")
+    else:
+        flash(f"eTIMS transmission failed: {message}", "danger")
+
+    # Check if referer is receipt page, and redirect there if so
+    referer = request.headers.get("Referer")
+    if referer and "receipt" in referer:
+        return redirect(referer)
+    return redirect(url_for('sales_report'))
+
 if __name__ == '__main__':
     app.run(debug=True)

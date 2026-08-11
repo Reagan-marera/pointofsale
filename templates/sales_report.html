@@ -93,6 +93,7 @@
                         <th class="text-end">Tax</th>
                         <th class="text-end">Total</th>
                         <th>Payment</th>
+                        <th>KRA eTIMS</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -109,8 +110,30 @@
                         <td class="text-end">KSh {{ "%.2f"|format(sale.total_amount) }}</td>
                         <td>{{ sale.payment_method|capitalize }}</td>
                         <td>
+                            {% if sale.etims_status == 'SENT' %}
+                                <span class="badge bg-success" title="eTIMS Invoice Number: {{ sale.etims_invc_no }}"><i class="fas fa-check"></i> Certified</span>
+                            {% elif sale.etims_status == 'FAILED' %}
+                                <span class="badge bg-danger" style="cursor: help;" title="Error: {{ sale.etims_error }}"><i class="fas fa-times"></i> Failed</span>
+                                <form action="{{ url_for('etims_retry_sale', sale_id=sale.id) }}" method="POST" class="d-inline ms-1">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1" title="Retry transmitting to eTIMS">
+                                        <i class="fas fa-sync-alt" style="font-size: 0.75rem;"></i>
+                                    </button>
+                                </form>
+                            {% else %}
+                                <span class="badge bg-secondary">Pending</span>
+                                <form action="{{ url_for('etims_retry_sale', sale_id=sale.id) }}" method="POST" class="d-inline ms-1">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1" title="Transmit to eTIMS">
+                                        <i class="fas fa-paper-plane" style="font-size: 0.75rem;"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        <td>
                             <a href="{{ url_for('print_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
                                 <i class="bi bi-printer"></i>
+                            </a>
+                            <a href="{{ url_for('view_receipt', receipt_number=sale.receipt_number) }}" class="btn btn-sm btn-outline-info" title="View Digital Receipt">
+                                <i class="fas fa-eye"></i>
                             </a>
                             {% if session['role'] == 'admin' %}
                             <form action="{{ url_for('delete_sale', sale_id=sale.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete sale #{{ sale.receipt_number }}? This action cannot be undone and will restock the items.');">
@@ -122,7 +145,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="10" class="p-0">
+                        <td colspan="11" class="p-0">
                             <div id="sale-{{ sale.id }}" class="collapse">
                                 <div class="p-3">
                                     <h6 class="mb-3">Sale Items</h6>

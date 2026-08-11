@@ -79,6 +79,17 @@
         </table>
         <hr>
         <p>Payment Method: {{ sale.payment_method|capitalize }}</p>
+        {% if sale.etims_status == 'SENT' %}
+        <hr>
+        <div style="text-align: center; font-size: 11px;">
+            <p><strong>KRA eTIMS CERTIFIED</strong></p>
+            <p>eTIMS Inv No: {{ sale.etims_invc_no }}</p>
+            <p>KRA Rcpt No: {{ sale.etims_rcpt_no }}</p>
+            <p style="word-break: break-all;">Sign: {{ sale.etims_rcpt_sign }}</p>
+            <p style="word-break: break-all;">Int Data: {{ sale.etims_intrl_data }}</p>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ sale.etims_qr_url|urlencode }}" alt="KRA QR" style="margin-top: 5px; max-width: 120px;">
+        </div>
+        {% endif %}
         <hr>
         <p style="text-align: center;">Thank you for your purchase!</p>
     </div>
