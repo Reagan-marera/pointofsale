@@ -4,7 +4,7 @@ from models import db, Product, Sale, SaleItem, ETIMSConfig, User
 from etims_service import ETIMSService
 from datetime import datetime
 
-class TestETIMSIntegration(unittest.TestCase):
+class TestDigiTaxIntegration(unittest.TestCase):
     def setUp(self):
         # Set up an in-memory database for testing
         self.app = Flask(__name__)
@@ -20,10 +20,10 @@ class TestETIMSIntegration(unittest.TestCase):
             # Create a test config
             config = ETIMSConfig(
                 etims_enabled=True,
-                etims_url='https://etims-api-sbx.kra.go.ke/etims-api',
-                etims_tin='P000000045R',
+                etims_url='https://api.digitax.tech/ke/v2',
+                etims_tin='2002720806',
                 etims_bhf_id='00',
-                etims_dvc_srl_no='TEST-SERIAL',
+                etims_dvc_srl_no='DUMMY-API-KEY',
                 etims_cmc_key='SIM-TEST-KEY',
                 etims_is_sandbox=True
             )
@@ -60,7 +60,7 @@ class TestETIMSIntegration(unittest.TestCase):
             config = ETIMSConfig.query.first()
             self.assertIsNotNone(config)
             self.assertTrue(config.etims_enabled)
-            self.assertEqual(config.etims_tin, 'P000000045R')
+            self.assertEqual(config.etims_tin, '2002720806')
 
     def test_etims_device_initialization_simulated(self):
         with self.app.app_context():
@@ -70,8 +70,8 @@ class TestETIMSIntegration(unittest.TestCase):
                 db_session=db.session,
                 tin='DUMMY-TIN',
                 bhf_id='00',
-                dvc_srl_no='DUMMY-SERIAL',
-                url='https://etims-api-sbx.kra.go.ke/etims-api',
+                dvc_srl_no='DUMMY-API-KEY',
+                url='https://api.digitax.tech/ke/v2',
                 is_sandbox=True
             )
             self.assertTrue(result['success'])
