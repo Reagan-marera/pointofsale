@@ -1982,7 +1982,8 @@ def transmit_sale_to_etims(sale_id, cashier_username="admin"):
     # First register any unregistered products in the sale to ensure no eTIMS rejections
     for item in sale.items:
         product = item.product
-        if not product.etims_item_code:
+        is_missing_etims = not product.etims_item_code or (config.etims_provider == 'DIGITAX' and not product.etims_digitax_id)
+        if is_missing_etims:
             try:
                 ETIMSService.register_product(config, product)
             except Exception as e:

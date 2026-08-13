@@ -204,14 +204,34 @@ class ETIMSService:
             # 2. Try listing first to find if it's already on DigiTax (to avoid 400 duplication error)
             try:
                 headers = cls.get_headers(config)
-                r_list = requests.get(f"{config.etims_url}/items?page_size=100", headers=headers, timeout=10)
-                if r_list.status_code == 200:
-                    data_list = r_list.json().get("data", [])
-                    for item_data in data_list:
-                        if item_data.get("item_bar_code") == product.barcode:
-                            product.etims_digitax_id = item_data.get("id")
-                            product.etims_item_code = item_data.get("etims_item_code") or product.etims_item_code
-                            return {"success": True, "message": "Product found in DigiTax catalog."}
+                page = 1
+                found = False
+                while page <= 5:
+                    r_list = requests.get(f"{config.etims_url}/items?page={page}&page_size=100", headers=headers, timeout=10)
+                    if r_list.status_code == 200:
+                        body_list = r_list.json()
+                        data_list = body_list.get("data", [])
+                        if not data_list:
+                            break
+                        for item_data in data_list:
+                            if item_data.get("item_bar_code") == product.barcode:
+                                product.etims_digitax_id = item_data.get("id")
+                                product.etims_item_code = item_data.get("etims_item_code") or product.etims_item_code
+                                found = True
+                                break
+                        if found:
+                            break
+                        # Check pagination to see if there are more pages
+                        pagination = body_list.get("pagination", {})
+                        if page >= pagination.get("total_pages", 1):
+                            break
+                        page += 1
+                    else:
+                        break
+                if found:
+                    from models import db
+                    db.session.commit() # commit immediately to persist it!
+                    return {"success": True, "message": "Product found in DigiTax catalog."}
             except Exception as e:
                 logger.error(f"Error querying DigiTax catalog: {e}")
 
@@ -235,6 +255,8 @@ class ETIMSService:
                     res_body = r_create.json()
                     product.etims_digitax_id = res_body.get("id")
                     product.etims_item_code = res_body.get("etims_item_code") or product.etims_item_code
+                    from models import db
+                    db.session.commit() # commit immediately to persist it!
                     return {"success": True, "message": "Product successfully registered with DigiTax."}
                 else:
                     return {"success": False, "message": f"DigiTax item creation failed ({r_create.status_code}): {r_create.text}"}
