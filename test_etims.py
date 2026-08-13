@@ -155,43 +155,67 @@ class TestDigiTaxIntegration(unittest.TestCase):
             db.session.add(sale_item)
             db.session.commit()
 
-            # Mock requests.post
-            with patch('requests.post') as mock_post:
-                mock_response = MagicMock()
-                mock_response.status_code = 200
-                mock_response.json.return_value = {
-                    "invoice_number": "DGTX-INV-1234",
-                    "receipt_number": "DGTX-RCPT-1234",
-                    "internal_data": "DGTX-INTRL-1234",
-                    "receipt_signature": "DGTX-SIGN-1234"
-                }
-                mock_post.return_value = mock_response
+            # Mock requests.get
+            with patch('requests.get') as mock_get:
+                mock_get_response = MagicMock()
+                mock_get_response.status_code = 200
+                mock_get_response.json.return_value = {"data": []}
+                mock_get.return_value = mock_get_response
 
-                result = ETIMSService.submit_sale(config, sale, 'test_cashier')
+                # Mock requests.post
+                with patch('requests.post') as mock_post:
+                    def post_side_effect(url, **kwargs):
+                        res = MagicMock()
+                        res.status_code = 201
+                        if "/items" in url:
+                            res.json.return_value = {
+                                "id": "item_mocked_123456",
+                                "etims_item_code": "KE3NTU0001"
+                            }
+                        else:
+                            res.json.return_value = {
+                                "invoice_number": "DGTX-INV-1234",
+                                "receipt_number": "DGTX-RCPT-1234",
+                                "internal_data": "DGTX-INTRL-1234",
+                                "receipt_signature": "DGTX-SIGN-1234"
+                            }
+                        return res
+                    mock_post.side_effect = post_side_effect
 
-                # Check that requests.post was called
-                mock_post.assert_called_once()
-                args, kwargs = mock_post.call_args
-                payload = kwargs.get('json', {})
+                    result = ETIMSService.submit_sale(config, sale, 'test_cashier')
 
-                # Verify payload item fields match DigiTax's mathematical rules
-                items = payload.get('items', [])
-                self.assertEqual(len(items), 1)
-                item_payload = items[0]
+                    # Verify calls
+                    self.assertEqual(mock_post.call_count, 2)
+                    first_call_args, first_call_kwargs = mock_post.call_args_list[0]
+                    second_call_args, second_call_kwargs = mock_post.call_args_list[1]
 
-                # unit_price = round(300.0 * 1.16, 2) = 348.0
-                # total_amount = round(1.5 * 348.0, 2) = 522.0
-                # taxable_amount = round(450.0, 2) = 450.0
-                # tax_amount = round(522.0 - 450.0, 2) = 72.0
-                self.assertEqual(item_payload['quantity'], 1.5)
-                self.assertEqual(item_payload['unit_price'], 348.0)
-                self.assertEqual(item_payload['total_amount'], 522.0)
-                self.assertEqual(item_payload['taxable_amount'], 450.0)
-                self.assertEqual(item_payload['tax_amount'], 72.0)
-                self.assertEqual(item_payload['unit_price'] * item_payload['quantity'], item_payload['total_amount'])
+                    # First call is items creation
+                    self.assertIn("/items", first_call_args[0])
+                    # Second call is sales creation
+                    self.assertIn("/sales", second_call_args[0])
 
-                self.assertTrue(result['success'])
-                self.assertEqual(result['invc_no'], 'DGTX-INV-1234')
+                    payload = second_call_kwargs.get('json', {})
+
+                    # Verify payload item fields match DigiTax's mathematical rules
+                    items = payload.get('items', [])
+                    self.assertEqual(len(items), 1)
+                    item_payload = items[0]
+
+                    # unit_price = round(300.0 * 1.16, 2) = 348.0
+                    # total_amount = round(1.5 * 348.0, 2) = 522.0
+                    # taxable_amount = round(450.0, 2) = 450.0
+                    # tax_amount = round(522.0 - 450.0, 2) = 72.0
+                    self.assertEqual(item_payload['quantity'], 1.5)
+                    self.assertEqual(item_payload['unit_price'], 348.0)
+                    self.assertEqual(item_payload['total_amount'], 522.0)
+                    self.assertEqual(item_payload['taxable_amount'], 450.0)
+                    self.assertEqual(item_payload['tax_amount'], 72.0)
+                    self.assertEqual(item_payload['unit_price'] * item_payload['quantity'], item_payload['total_amount'])
+                    self.assertEqual(item_payload['id'], 'item_mocked_123456')
+                    self.assertEqual(item_payload['item_id'], 'item_mocked_123456')
+
+                    self.assertTrue(result['success'])
+                    self.assertEqual(result['invc_no'], 'DGTX-INV-1234')
 
 if __name__ == '__main__':
     unittest.main()

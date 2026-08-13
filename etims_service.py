@@ -187,6 +187,61 @@ class ETIMSService:
         """
         Submits product register payload to direct eTIMS / third parties.
         """
+        provider = config.etims_provider or "DIGITAX"
+
+        if provider == "SIMULATED" or config.etims_cmc_key.startswith("SIM-"):
+            if not product.etims_digitax_id:
+                product.etims_digitax_id = f"item_simulated_{product.barcode}"
+            if not product.etims_item_code:
+                product.etims_item_code = f"KE1{product.barcode}"
+            return {"success": True, "message": "Product registered locally (SIMULATED)."}
+
+        if provider == "DIGITAX":
+            # 1. Check if we already have it
+            if product.etims_digitax_id:
+                return {"success": True, "message": "Product already registered."}
+
+            # 2. Try listing first to find if it's already on DigiTax (to avoid 400 duplication error)
+            try:
+                headers = cls.get_headers(config)
+                r_list = requests.get(f"{config.etims_url}/items?page_size=100", headers=headers, timeout=10)
+                if r_list.status_code == 200:
+                    data_list = r_list.json().get("data", [])
+                    for item_data in data_list:
+                        if item_data.get("item_bar_code") == product.barcode:
+                            product.etims_digitax_id = item_data.get("id")
+                            product.etims_item_code = item_data.get("etims_item_code") or product.etims_item_code
+                            return {"success": True, "message": "Product found in DigiTax catalog."}
+            except Exception as e:
+                logger.error(f"Error querying DigiTax catalog: {e}")
+
+            # 3. If not found, register it!
+            try:
+                payload = {
+                    "item_class_code": product.etims_item_cls_code or "99020000",
+                    "item_type_code": "3",  # default standard item type
+                    "item_name": product.name,
+                    "origin_nation_code": "KE",
+                    "package_unit_code": "NT",
+                    "quantity_unit_code": "U",
+                    "tax_type_code": product.etims_tax_type or ("B" if product.vatable else "D"),
+                    "default_unit_price": float(product.selling_price),
+                    "stock_quantity": int(product.current_stock or 0),
+                    "item_bar_code": product.barcode
+                }
+                headers = cls.get_headers(config)
+                r_create = requests.post(f"{config.etims_url}/items", json=payload, headers=headers, timeout=12)
+                if r_create.status_code in [200, 201]:
+                    res_body = r_create.json()
+                    product.etims_digitax_id = res_body.get("id")
+                    product.etims_item_code = res_body.get("etims_item_code") or product.etims_item_code
+                    return {"success": True, "message": "Product successfully registered with DigiTax."}
+                else:
+                    return {"success": False, "message": f"DigiTax item creation failed ({r_create.status_code}): {r_create.text}"}
+            except Exception as e:
+                return {"success": False, "message": f"DigiTax registration error: {str(e)}"}
+
+        # Fallback for direct OSCU or other providers
         if not product.etims_item_code:
             product.etims_item_code = f"KE1{product.barcode}"
         return {"success": True, "message": "Product validated."}
@@ -363,8 +418,17 @@ class ETIMSService:
                         tax_amt = 0.0
                         tax_rate = 0.0
 
+                    # Dynamically register product if it doesn't have an etims_digitax_id yet
+                    if not item.product.etims_digitax_id:
+                        try:
+                            cls.register_product(config, item.product)
+                        except Exception as reg_err:
+                            logger.error(f"On-the-fly DigiTax registration failed: {reg_err}")
+
+                    item_id_to_use = item.product.etims_digitax_id or item.product.barcode
+
                     items_payload.append({
-                        "id": item.product.barcode,
+                        "id": item_id_to_use,
                         "quantity": qty,
                         "unit_price": up_inc,
                         "total_amount": total_amt_inc,
@@ -376,7 +440,7 @@ class ETIMSService:
                         "discount_amount": 0.0,
                         "etims_item_code": item.product.etims_item_code or f"KE1{item.product.barcode}",
                         "is_stockable": True,
-                        "item_id": item.product.barcode
+                        "item_id": item_id_to_use
                     })
 
                 payload = {
