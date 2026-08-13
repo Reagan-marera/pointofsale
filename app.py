@@ -2074,6 +2074,8 @@ def etims_sync_products():
             success_count += 1
         else:
             fail_count += 1
+            app.logger.error(f"Product {product.name} sync failed: {result.get('message')}")
+            flash(f"Failed to sync {product.name}: {result.get('message')}", "danger")
 
     db.session.commit()
 
