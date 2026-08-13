@@ -53,6 +53,7 @@ class Product(db.Model):
     etims_item_code = db.Column(db.String(50), nullable=True)
     etims_item_cls_code = db.Column(db.String(50), default='5059690800')
     etims_tax_type = db.Column(db.String(5), default='B')
+    etims_digitax_id = db.Column(db.String(100), nullable=True)
 
     supplier = db.relationship('Supplier', backref=db.backref('supplier_products', lazy=True))
     dealer = db.relationship('Dealer', backref='products')

@@ -89,6 +89,12 @@
             <p style="word-break: break-all;">Int Data: {{ sale.etims_intrl_data }}</p>
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ sale.etims_qr_url|urlencode }}" alt="KRA QR" style="margin-top: 5px; max-width: 120px;">
         </div>
+        {% else %}
+        <hr>
+        <div style="text-align: center; font-size: 11px;">
+            <p>Scan to view digital receipt:</p>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ (request.url_root ~ 'receipt/' ~ sale.receipt_number)|urlencode }}" alt="Digital QR" style="margin-top: 5px; max-width: 100px;">
+        </div>
         {% endif %}
         <hr>
         <p style="text-align: center;">Thank you for your purchase!</p>

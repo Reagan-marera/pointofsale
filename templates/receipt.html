@@ -111,6 +111,12 @@
             {% endif %}
             
             <div class="text-center mt-4 pt-4 border-top">
+                {% if sale.etims_status != 'SENT' %}
+                <div class="mb-3">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ (request.url_root ~ 'receipt/' ~ sale.receipt_number)|urlencode }}" class="img-fluid border p-1 bg-white" alt="Digital Receipt QR" style="max-height: 100px;">
+                    <div class="text-muted mt-1" style="font-size: 0.75rem;">Scan to view digital receipt</div>
+                </div>
+                {% endif %}
                 <p class="mb-1">Thank you for shopping with us!</p>
                 <p class="text-muted small">Goods sold are not returnable unless faulty</p>
             </div>

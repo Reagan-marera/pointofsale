@@ -30,7 +30,8 @@ with app.app_context():
             cols_products = [
                 ("etims_item_code", "VARCHAR(50)"),
                 ("etims_item_cls_code", "VARCHAR(50) DEFAULT '5059690800'"),
-                ("etims_tax_type", "VARCHAR(5) DEFAULT 'B'")
+                ("etims_tax_type", "VARCHAR(5) DEFAULT 'B'"),
+                ("etims_digitax_id", "VARCHAR(100)")
             ]
             for col_name, col_type in cols_products:
                 try:
