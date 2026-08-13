@@ -39,6 +39,13 @@ with app.app_context():
                 except Exception:
                     db.session.rollback()
 
+            # Add columns to etims_configs if missing
+            try:
+                db.session.execute(text("ALTER TABLE etims_configs ADD COLUMN etims_provider VARCHAR(50) DEFAULT 'DIGITAX'"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
             # Add columns to sales if missing
             cols_sales = [
                 ("etims_invc_no", "INTEGER"),
@@ -2005,6 +2012,7 @@ def etims_settings():
     config = get_etims_config()
     if request.method == 'POST':
         config.etims_enabled = 'etims_enabled' in request.form
+        config.etims_provider = request.form.get('etims_provider', 'DIGITAX')
         config.etims_url = request.form['etims_url'].strip()
         config.etims_tin = request.form['etims_tin'].strip()
         config.etims_bhf_id = request.form['etims_bhf_id'].strip()
