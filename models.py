@@ -297,13 +297,14 @@ class ETIMSConfig(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     etims_enabled = db.Column(db.Boolean, default=False)
-    etims_url = db.Column(db.String(200), default='https://etims-api-sbx.kra.go.ke/etims-api')
+    etims_provider = db.Column(db.String(50), default='DIGITAX') # DIGITAX, DIRECT, SALAMI, SIMULATED
+    etims_url = db.Column(db.String(200), default='https://api.digitax.tech/ke/v2')
     etims_tin = db.Column(db.String(20), default='')
     etims_bhf_id = db.Column(db.String(10), default='00')
-    etims_dvc_srl_no = db.Column(db.String(50), default='')
+    etims_dvc_srl_no = db.Column(db.String(200), default='') # Serves as API key / Device Serial
     etims_cmc_key = db.Column(db.String(256), default='')
     etims_is_sandbox = db.Column(db.Boolean, default=True)
     next_invc_no = db.Column(db.Integer, default=1)
 
     def __repr__(self):
-        return f'<ETIMSConfig enabled={self.etims_enabled}>'
+        return f'<ETIMSConfig provider={self.etims_provider} enabled={self.etims_enabled}>'
