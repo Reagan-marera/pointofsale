@@ -344,6 +344,41 @@ class ETIMSService:
                         "message": f"KRA submission failed ({body.get('resultCd')}): {body.get('resultMsg')}"
                     }
             else: # DIGITAX
+                items_payload = []
+                for item in sale.items:
+                    is_vat = bool(item.product.vatable)
+                    qty = float(item.quantity)
+                    raw_up = float(item.unit_price)
+                    taxable_amt = round(item.total_price or (qty * raw_up), 2)
+
+                    # Compute tax-inclusive unit price
+                    up_inc = round(raw_up * (1.16 if is_vat else 1.0), 2)
+                    # Compute total amount directly from up_inc to guarantee matching quantity * unit_price
+                    total_amt_inc = round(qty * up_inc, 2)
+
+                    if is_vat:
+                        tax_amt = round(total_amt_inc - taxable_amt, 2)
+                        tax_rate = 16.0
+                    else:
+                        tax_amt = 0.0
+                        tax_rate = 0.0
+
+                    items_payload.append({
+                        "id": item.product.barcode,
+                        "quantity": qty,
+                        "unit_price": up_inc,
+                        "total_amount": total_amt_inc,
+                        "taxable_amount": taxable_amt,
+                        "tax_amount": tax_amt,
+                        "tax_rate": tax_rate,
+                        "tax_type_code": item.product.etims_tax_type or ("B" if is_vat else "D"),
+                        "discount_rate": 0.0,
+                        "discount_amount": 0.0,
+                        "etims_item_code": item.product.etims_item_code or f"KE1{item.product.barcode}",
+                        "is_stockable": True,
+                        "item_id": item.product.barcode
+                    })
+
                 payload = {
                     "sale_date": sale_date_str,
                     "customer_tin": "",
@@ -352,24 +387,7 @@ class ETIMSService:
                     "payment_type_code": "01",
                     "invoice_status_code": "02",
                     "is_tax_exempt": not any(item.product.vatable for item in sale.items),
-                    "items": [
-                        {
-                            "id": item.product.barcode,
-                            "quantity": float(item.quantity),
-                            "unit_price": float(item.unit_price),
-                            "total_amount": round(item.total_price * (1.16 if item.product.vatable else 1.0), 2),
-                            "taxable_amount": round(item.total_price, 2),
-                            "tax_amount": round(item.total_price * 0.16 if item.product.vatable else 0.0, 2),
-                            "tax_rate": 16.0 if item.product.vatable else 0.0,
-                            "tax_type_code": item.product.etims_tax_type or ("B" if item.product.vatable else "D"),
-                            "discount_rate": 0.0,
-                            "discount_amount": 0.0,
-                            "etims_item_code": item.product.etims_item_code or f"KE1{item.product.barcode}",
-                            "is_stockable": True,
-                            "item_id": item.product.barcode
-                        }
-                        for item in sale.items
-                    ]
+                    "items": items_payload
                 }
                 r = requests.post(
                     f"{config.etims_url}/sales",
