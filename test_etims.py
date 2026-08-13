@@ -121,5 +121,77 @@ class TestDigiTaxIntegration(unittest.TestCase):
             self.assertIsNotNone(result['rcpt_sign'])
             self.assertIsNotNone(result['intrl_data'])
 
+    def test_etims_sale_submission_digitax_payload_pricing(self):
+        from unittest.mock import patch, MagicMock
+        with self.app.app_context():
+            config = ETIMSConfig.query.first()
+            # Set provider to DIGITAX explicitly
+            config.etims_provider = 'DIGITAX'
+            # Change cmc_key so it doesn't trigger mock/simulated check
+            config.etims_cmc_key = 'REAL-API-KEY-123'
+            config.etims_url = 'https://api.digitax.tech/ke/v2'
+
+            user = User.query.first()
+            product = Product.query.first() # Vatable laptop selling_price=70000.0, vatable=True
+
+            sale = Sale(
+                receipt_number='IMO-20260101-0002',
+                user_id=user.id,
+                subtotal=70000.0,
+                tax_amount=11200.0,
+                total_amount=81200.0,
+                payment_method='cash'
+            )
+            db.session.add(sale)
+            db.session.commit()
+
+            sale_item = SaleItem(
+                sale_id=sale.id,
+                product_id=product.id,
+                quantity=1.5, # Let's test decimal quantity
+                unit_price=300.0,
+                total_price=450.0
+            )
+            db.session.add(sale_item)
+            db.session.commit()
+
+            # Mock requests.post
+            with patch('requests.post') as mock_post:
+                mock_response = MagicMock()
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "invoice_number": "DGTX-INV-1234",
+                    "receipt_number": "DGTX-RCPT-1234",
+                    "internal_data": "DGTX-INTRL-1234",
+                    "receipt_signature": "DGTX-SIGN-1234"
+                }
+                mock_post.return_value = mock_response
+
+                result = ETIMSService.submit_sale(config, sale, 'test_cashier')
+
+                # Check that requests.post was called
+                mock_post.assert_called_once()
+                args, kwargs = mock_post.call_args
+                payload = kwargs.get('json', {})
+
+                # Verify payload item fields match DigiTax's mathematical rules
+                items = payload.get('items', [])
+                self.assertEqual(len(items), 1)
+                item_payload = items[0]
+
+                # unit_price = round(300.0 * 1.16, 2) = 348.0
+                # total_amount = round(1.5 * 348.0, 2) = 522.0
+                # taxable_amount = round(450.0, 2) = 450.0
+                # tax_amount = round(522.0 - 450.0, 2) = 72.0
+                self.assertEqual(item_payload['quantity'], 1.5)
+                self.assertEqual(item_payload['unit_price'], 348.0)
+                self.assertEqual(item_payload['total_amount'], 522.0)
+                self.assertEqual(item_payload['taxable_amount'], 450.0)
+                self.assertEqual(item_payload['tax_amount'], 72.0)
+                self.assertEqual(item_payload['unit_price'] * item_payload['quantity'], item_payload['total_amount'])
+
+                self.assertTrue(result['success'])
+                self.assertEqual(result['invc_no'], 'DGTX-INV-1234')
+
 if __name__ == '__main__':
     unittest.main()
