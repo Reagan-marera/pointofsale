@@ -206,7 +206,7 @@ class ETIMSService:
                 headers = cls.get_headers(config)
                 page = 1
                 found = False
-                while page <= 5:
+                while page <= 10:
                     r_list = requests.get(f"{config.etims_url}/items?page={page}&page_size=100", headers=headers, timeout=10)
                     if r_list.status_code == 200:
                         body_list = r_list.json()
@@ -221,9 +221,7 @@ class ETIMSService:
                                 break
                         if found:
                             break
-                        # Check pagination to see if there are more pages
-                        pagination = body_list.get("pagination", {})
-                        if page >= pagination.get("total_pages", 1):
+                        if len(data_list) < 100:
                             break
                         page += 1
                     else:
